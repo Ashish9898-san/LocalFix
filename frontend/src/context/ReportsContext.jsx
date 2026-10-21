@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { INITIAL_SAMPLE_REPORTS } from '../data/sampleReports';
 
-const LOCAL_STORAGE_KEY = 'localfix_sample_reports_v1';
+const LOCAL_STORAGE_KEY = 'localfix_mock_reports_v2';
 
 const ReportsContext = createContext(null);
 
@@ -33,11 +33,10 @@ export const ReportsProvider = ({ children }) => {
 
   /**
    * Add a newly submitted report to the local state
-   * @param {Object} reportData - { title, description, category, location, priority }
+   * @param {Object} reportData - { title, description, category, location, priority, imageUrl }
    * @returns {Object} newly created report with generated id, status, and timestamp
    */
   const addReport = (reportData) => {
-    // Generate a human-friendly unique ID, e.g., REP-2091
     const newId = `REP-${Math.floor(1000 + Math.random() * 9000)}`;
     const newReport = {
       id: newId,
@@ -48,10 +47,50 @@ export const ReportsProvider = ({ children }) => {
       status: 'PENDING',
       priority: reportData.priority || 'Medium',
       createdAt: new Date().toISOString(),
+      imageUrl: reportData.imageUrl || null,
     };
 
     setReports((prevReports) => [newReport, ...prevReports]);
     return newReport;
+  };
+
+  /**
+   * Update the status of an existing report (used by Administrator)
+   * @param {string} id - Report ID
+   * @param {'PENDING'|'IN_PROGRESS'|'RESOLVED'} newStatus - New status
+   * @returns {boolean} true if updated successfully
+   */
+  const updateReportStatus = (id, newStatus) => {
+    if (!id || !newStatus) return false;
+    const normalizedStatus = newStatus.toUpperCase();
+
+    let updated = false;
+    setReports((prevReports) =>
+      prevReports.map((report) => {
+        if (report.id.toLowerCase() === id.trim().toLowerCase()) {
+          updated = true;
+          return {
+            ...report,
+            status: normalizedStatus,
+            updatedAt: new Date().toISOString(),
+          };
+        }
+        return report;
+      })
+    );
+
+    return updated;
+  };
+
+  /**
+   * Delete a report by ID (optional admin capability)
+   * @param {string} id - Report ID
+   */
+  const deleteReport = (id) => {
+    if (!id) return;
+    setReports((prevReports) =>
+      prevReports.filter((r) => r.id.toLowerCase() !== id.trim().toLowerCase())
+    );
   };
 
   /**
@@ -80,6 +119,8 @@ export const ReportsProvider = ({ children }) => {
       value={{
         reports,
         addReport,
+        updateReportStatus,
+        deleteReport,
         getReportById,
         resetToSampleData,
       }}

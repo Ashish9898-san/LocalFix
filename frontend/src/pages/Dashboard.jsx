@@ -10,15 +10,17 @@ import {
   PlusCircle, 
   ArrowRight,
   TrendingUp,
-  Tag
+  Tag,
+  ShieldCheck
 } from 'lucide-react';
 import { useReports } from '../context/ReportsContext';
 import StatusBadge from '../components/StatusBadge';
+import { formatDate } from '../utils/reportUtils';
 
 export default function Dashboard() {
   const { reports, resetToSampleData } = useReports();
 
-  // Dynamically calculate statistical metrics from the current reports state
+  // Dynamically calculate statistical metrics from current reports state
   const total = reports.length;
   const pending = reports.filter((r) => r.status === 'PENDING').length;
   const inProgress = reports.filter((r) => r.status === 'IN_PROGRESS').length;
@@ -44,21 +46,30 @@ export default function Dashboard() {
         <div className="flex items-center gap-2.5">
           <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
           <div>
-            <strong>Phase 1 Demonstration Dashboard:</strong> The metrics below are computed dynamically from your client-side sample data and locally created reports.
+            <strong>Phase 2 Demonstration Dashboard:</strong> The metrics below are computed dynamically from your client-side mock reports. Status updates made in the Admin Dashboard instantly reflect here!
           </div>
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            if (window.confirm('Reset all reports back to initial sample state?')) {
-              resetToSampleData();
-            }
-          }}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-900 rounded-lg font-semibold text-xs transition-colors shrink-0"
-        >
-          <RotateCcw className="w-3.5 h-3.5" />
-          Reset Demo Data
-        </button>
+        <div className="flex items-center gap-2">
+          <Link
+            to="/admin"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg font-semibold text-xs transition-colors shrink-0"
+          >
+            <ShieldCheck className="w-3.5 h-3.5" />
+            Admin Panel
+          </Link>
+          <button
+            type="button"
+            onClick={() => {
+              if (window.confirm('Reset all reports back to initial mock state?')) {
+                resetToSampleData();
+              }
+            }}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-900 rounded-lg font-semibold text-xs transition-colors shrink-0"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            Reset Demo Data
+          </button>
+        </div>
       </div>
 
       {/* Page Header */}
@@ -72,13 +83,22 @@ export default function Dashboard() {
           </p>
         </div>
 
-        <Link
-          to="/report-issue"
-          className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-sm font-semibold shadow-sm transition-colors"
-        >
-          <PlusCircle className="w-4 h-4" />
-          <span>New Report</span>
-        </Link>
+        <div className="flex items-center gap-2.5">
+          <Link
+            to="/reports"
+            className="inline-flex items-center gap-1.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-3.5 py-2 rounded-xl text-sm font-semibold transition-colors"
+          >
+            <Layers className="w-4 h-4 text-gray-500" />
+            <span>Browse All</span>
+          </Link>
+          <Link
+            to="/report-issue"
+            className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-sm font-semibold shadow-sm transition-colors"
+          >
+            <PlusCircle className="w-4 h-4" />
+            <span>New Report</span>
+          </Link>
+        </div>
       </div>
 
       {/* KPI Cards Grid */}
@@ -241,7 +261,7 @@ export default function Dashboard() {
               {reports.slice(0, 5).map((r) => (
                 <tr key={r.id} className="hover:bg-gray-50/60 transition-colors">
                   <td className="py-3.5 px-6 font-mono font-semibold text-gray-600">
-                    {r.id}
+                    #{r.id}
                   </td>
                   <td className="py-3.5 px-6">
                     <div className="font-semibold text-gray-900 line-clamp-1">{r.title}</div>
@@ -254,7 +274,7 @@ export default function Dashboard() {
                     <StatusBadge status={r.status} />
                   </td>
                   <td className="py-3.5 px-6 text-gray-500">
-                    {new Date(r.createdAt).toLocaleDateString()}
+                    {formatDate(r.createdAt)}
                   </td>
                   <td className="py-3.5 px-6 text-right">
                     <Link

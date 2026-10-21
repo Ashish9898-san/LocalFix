@@ -1,4 +1,4 @@
-# LocalFix — Frontend Client (Phase 1)
+# LocalFix — Frontend Client (Phase 2)
 
 This is the React frontend application for **LocalFix — A Local Problem Reporting & Tracking Platform**.
 
@@ -47,17 +47,21 @@ In the `frontend/` directory, you can run:
 
 ---
 
-## 4. Current Phase 1 Features (Sample & Local State)
+## 4. Phase 2 Implemented Features
 
 - **Landing Page (`/`)**: Hero section, 3-step reporting workflow, category showcase, and live metric preview.
-- **Browse Reports (`/reports`)**: Keyword search, category filter, status filter, sorting, and responsive report cards.
-- **Report an Issue (`/report-issue`)**: Accessible form with client-side validation, error messages, and immediate local state updates with `localStorage` persistence.
-- **Report Details (`/reports/:id`)**: Individual report view featuring ticket ID, detailed description, metadata, and an interactive 3-stage resolution progress tracker. Handles invalid IDs with a friendly 404 message.
-- **Civic Dashboard (`/dashboard`)**: Dynamically computes counts (Total, Pending, In Progress, Resolved), percentage progress bars, and category breakdown. Includes a "Reset Demo Data" button.
+- **Browse Reports (`/reports`)**: Keyword search, category filter, status filter, location filter, date sorting, and responsive report cards with optional photo thumbnails.
+- **Report an Issue (`/report-issue`)**: Accessible form with client-side validation, error messages, optional photo attachment with validation (JPEG/PNG/WebP, max 2MB) and preview, reset option, and immediate mock state update.
+- **Report Details (`/reports/:id`)**: Individual report view featuring ticket ID, photo evidence preview, detailed description, metadata, and an interactive 3-stage resolution progress tracker. Handles invalid IDs with a friendly 404 message.
+- **Civic Dashboard (`/dashboard`)**: Dynamically computes statistics (Total, Pending, In Progress, Resolved), percentage progress bars, and category breakdown. Includes a "Reset Demo Data" button.
+- **Administrator Dashboard (`/admin`)**: Dedicated interface to inspect community reports, search, filter, and change report status (`Pending`, `In Progress`, `Resolved`). Changing status automatically updates the browse page, report details page, and dashboard statistics!
 
 ---
 
 ## 5. What is Simulated vs. What Comes Next
 
-- **Currently Simulated:** Reports are stored in browser memory and synchronized with `localStorage`. No network requests are made.
-- **Future Phase 6 Integration:** In Phase 6, React will use Axios to make HTTP requests to the Spring Boot REST API (`http://localhost:8080/api/reports`), which will query and persist data in MySQL.
+- **Currently Simulated:** Reports and status changes are stored in client-side memory and synchronized with `localStorage`. No network requests are made.
+- **Future Backend Integration (Phases 3 to 7):**
+  - **Phase 3 & 4:** Spring Boot backend with Java 21 and MySQL database.
+  - **Phase 5 & 6:** REST API endpoints (`GET /api/reports`, `POST /api/reports`, `PATCH /api/reports/:id/status`) connected via Axios.
+  - **Phase 7:** Real authentication and role-based access control (Admin vs Citizen) using Spring Security.

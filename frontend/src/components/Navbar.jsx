@@ -7,7 +7,8 @@ import {
   PlusCircle, 
   LayoutDashboard, 
   Layers, 
-  Home as HomeIcon 
+  Home as HomeIcon,
+  ShieldCheck
 } from 'lucide-react';
 
 export default function Navbar() {
@@ -18,6 +19,7 @@ export default function Navbar() {
     { to: '/reports', label: 'Browse Reports', icon: Layers },
     { to: '/report-issue', label: 'Report an Issue', icon: PlusCircle },
     { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { to: '/admin', label: 'Admin', icon: ShieldCheck, badge: 'Demo' },
   ];
 
   const getNavLinkClass = ({ isActive }) =>
@@ -57,6 +59,11 @@ export default function Navbar() {
                 <NavLink key={link.to} to={link.to} className={getNavLinkClass}>
                   <Icon className="w-4 h-4" />
                   <span>{link.label}</span>
+                  {link.badge && (
+                    <span className="text-[10px] uppercase font-bold bg-amber-400 text-amber-950 px-1.5 py-0.2 rounded">
+                      {link.badge}
+                    </span>
+                  )}
                 </NavLink>
               );
             })}
@@ -103,6 +110,11 @@ export default function Navbar() {
               >
                 <Icon className="w-5 h-5" />
                 <span>{link.label}</span>
+                {link.badge && (
+                  <span className="text-[10px] uppercase font-bold bg-amber-400 text-amber-950 px-1.5 py-0.2 rounded ml-1">
+                    {link.badge}
+                  </span>
+                )}
               </NavLink>
             );
           })}

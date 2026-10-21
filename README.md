@@ -22,9 +22,10 @@ LocalFix/
 │   ├── public/                   # Static public assets
 │   ├── src/
 │   │   ├── components/           # Reusable UI components
-│   │   │   ├── Navbar.jsx        # Navigation bar with responsive drawer
+│   │   │   ├── Navbar.jsx        # Navigation bar with responsive drawer and Admin link
 │   │   │   ├── Footer.jsx        # App footer with links and civic tips
-│   │   │   ├── ReportCard.jsx    # Card displaying summary of an issue
+│   │   │   ├── ReportCard.jsx    # Card displaying summary of an issue with image support
+│   │   │   ├── SearchFilters.jsx # Reusable search, filter, and sorting toolbar
 │   │   │   ├── StatusBadge.jsx   # Accessible, color-coded status badge
 │   │   │   ├── Loading.jsx       # Animated accessible loading indicator
 │   │   │   ├── ErrorMessage.jsx  # Alert banner with retry support
@@ -32,13 +33,16 @@ LocalFix/
 │   │   ├── pages/                # Main application views
 │   │   │   ├── Home.jsx          # Public landing page with hero & workflow
 │   │   │   ├── Reports.jsx       # Browse, search, filter, and sort reports
-│   │   │   ├── ReportIssue.jsx   # Form to submit new issue with validation
-│   │   │   ├── ReportDetails.jsx # Detailed report view with status timeline
-│   │   │   └── Dashboard.jsx     # Dynamic statistics and category breakdown
+│   │   │   ├── ReportIssue.jsx   # Form to submit issue with validation & photo attachment
+│   │   │   ├── ReportDetails.jsx # Detailed report view with photo and status timeline
+│   │   │   ├── Dashboard.jsx     # Dynamic statistics, category & status breakdown
+│   │   │   └── AdminDashboard.jsx# Admin report management & status update simulation
 │   │   ├── context/
-│   │   │   └── ReportsContext.jsx# Shared state and localStorage persistence
+│   │   │   └── ReportsContext.jsx# Shared state, status updater, and localStorage persistence
 │   │   ├── data/
-│   │   │   └── sampleReports.js  # Sample reports and category/status definitions
+│   │   │   └── sampleReports.js  # Sample reports with categories, statuses, and photo links
+│   │   ├── utils/
+│   │   │   └── reportUtils.js    # Date formatting, image validation, and filter/sort logic
 │   │   ├── App.jsx               # Route definitions and layout wrapper
 │   │   ├── main.jsx              # React DOM entry point
 │   │   └── index.css             # Tailwind base & utilities
@@ -54,14 +58,14 @@ LocalFix/
 
 ---
 
-## How to Run the Frontend
+## How to Run the Frontend Locally
 
 1. Ensure **Node.js** (v18+) and **npm** (v9+) are installed.
 2. Change into the frontend directory:
    ```bash
    cd frontend
    ```
-3. Install dependencies:
+3. Install dependencies (if not already done):
    ```bash
    npm install
    ```
@@ -76,14 +80,14 @@ LocalFix/
 
 ---
 
-## Current Status: Phase 1 Completed
+## Progress Checklist
 
-- [x] Initialized Git repository and root `.gitignore`.
-- [x] Scaffolded React + Vite + Tailwind CSS frontend.
-- [x] Implemented responsive Navigation and Footer.
-- [x] Implemented Homepage with Hero section and 3-step process.
-- [x] Implemented Browse Reports with live search, category/status filters, and sorting.
-- [x] Implemented accessible Report Submission form with field validation and immediate local updates.
-- [x] Implemented Report Details page with 3-stage visual resolution progress tracker.
-- [x] Implemented Dashboard dynamically calculating statistics from report state.
-- [x] Verified zero-error production build (`npm run build`) and HTTP preview serving.
+- [x] **Phase 0:** Environment inspection, architecture, and planning.
+- [x] **Phase 1:** Initial frontend scaffolding, layout, and mock structure.
+- [x] **Phase 2:** Complete frontend reporting interface (Search, Filters, Photo Upload preview, Report Details, Dynamic Dashboard, Admin Panel).
+- [ ] **Phase 3:** Spring Boot Foundation (Java 21, Maven, health endpoint).
+- [ ] **Phase 4:** MySQL Database Integration (JPA Entities & Repository).
+- [ ] **Phase 5:** REST API Development (Report CRUD, Search & Filtering endpoints).
+- [ ] **Phase 6:** Frontend and Backend Integration (Axios client, live API integration).
+- [ ] **Phase 7:** Spring Security & Role-Based Authorization.
+- [ ] **Phase 8:** Final Testing, Error Handling, and Deployment Documentation.

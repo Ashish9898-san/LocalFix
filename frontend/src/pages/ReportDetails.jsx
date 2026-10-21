@@ -8,13 +8,14 @@ import {
   Clock, 
   CheckCircle2, 
   AlertTriangle, 
-  Share2, 
   ShieldCheck,
-  FileText
+  FileText,
+  Image as ImageIcon
 } from 'lucide-react';
 import { useReports } from '../context/ReportsContext';
 import StatusBadge from '../components/StatusBadge';
 import EmptyState from '../components/EmptyState';
+import { formatFullDateTime } from '../utils/reportUtils';
 
 export default function ReportDetails() {
   const { id } = useParams();
@@ -34,17 +35,6 @@ export default function ReportDetails() {
       </div>
     );
   }
-
-  // Format creation date
-  const createdDate = new Date(report.createdAt);
-  const formattedFullDate = createdDate.toLocaleString(undefined, {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
 
   // Timeline step statuses
   const isPending = report.status === 'PENDING';
@@ -70,8 +60,8 @@ export default function ReportDetails() {
         <div className="bg-gray-50 border-b border-gray-200/80 p-6 sm:p-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="font-mono text-xs font-bold text-gray-500 bg-gray-200/70 px-2.5 py-1 rounded-md">
-                {report.id}
+              <span className="font-mono text-xs font-bold text-gray-600 bg-gray-200/80 px-2.5 py-1 rounded-md">
+                #{report.id}
               </span>
               <span className="text-xs font-semibold text-emerald-800 bg-emerald-100/70 px-2.5 py-1 rounded-md flex items-center gap-1">
                 <Tag className="w-3 h-3" />
@@ -95,8 +85,25 @@ export default function ReportDetails() {
 
         {/* Content Body Grid */}
         <div className="p-6 sm:p-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left Column: Description & Visual Status Progress */}
+          {/* Left Column: Description, Photo, and Progress Tracker */}
           <div className="lg:col-span-2 space-y-8">
+            {/* Attached Photo if available */}
+            {report.imageUrl && (
+              <div>
+                <h2 className="text-sm font-bold uppercase tracking-wider text-gray-400 mb-3 flex items-center gap-2">
+                  <ImageIcon className="w-4 h-4 text-emerald-600" />
+                  Attached Photo Evidence
+                </h2>
+                <div className="rounded-2xl overflow-hidden border border-gray-200 bg-gray-100 max-h-96 shadow-sm">
+                  <img
+                    src={report.imageUrl}
+                    alt={report.title}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              </div>
+            )}
+
             {/* Description Section */}
             <div>
               <h2 className="text-sm font-bold uppercase tracking-wider text-gray-400 mb-3 flex items-center gap-2">
@@ -143,7 +150,7 @@ export default function ReportDetails() {
                   <span className={`text-xs font-bold ${isInProgress || isResolved ? 'text-gray-900' : 'text-gray-400'}`}>
                     In Progress
                   </span>
-                  <span className="text-[11px] text-gray-500 mt-0.5">Crew dispatched</span>
+                  <span className="text-[11px] text-gray-500 mt-0.5">Field crew assigned</span>
                 </div>
 
                 {/* Step 3: Resolved */}
@@ -158,7 +165,7 @@ export default function ReportDetails() {
                   <span className={`text-xs font-bold ${isResolved ? 'text-emerald-700' : 'text-gray-400'}`}>
                     Resolved
                   </span>
-                  <span className="text-[11px] text-gray-500 mt-0.5">Issue fixed</span>
+                  <span className="text-[11px] text-gray-500 mt-0.5">Repairs completed</span>
                 </div>
               </div>
             </div>
@@ -184,9 +191,19 @@ export default function ReportDetails() {
                   <span className="text-gray-500 block mb-0.5 font-medium">Date Reported</span>
                   <div className="flex items-start gap-1.5 font-semibold text-gray-900">
                     <Calendar className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                    <span>{formattedFullDate}</span>
+                    <span>{formatFullDateTime(report.createdAt)}</span>
                   </div>
                 </div>
+
+                {report.updatedAt && (
+                  <div>
+                    <span className="text-gray-500 block mb-0.5 font-medium">Last Status Update</span>
+                    <div className="flex items-start gap-1.5 font-semibold text-gray-900">
+                      <Clock className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                      <span>{formatFullDateTime(report.updatedAt)}</span>
+                    </div>
+                  </div>
+                )}
 
                 <div>
                   <span className="text-gray-500 block mb-0.5 font-medium">Issue Category</span>
@@ -204,12 +221,21 @@ export default function ReportDetails() {
               </div>
             </div>
 
-            {/* Note box */}
-            <div className="p-4 bg-emerald-50/70 border border-emerald-100 rounded-xl text-xs text-emerald-900 space-y-1">
-              <p className="font-semibold">Civic Engagement Tip</p>
+            {/* Admin Quick Action Banner */}
+            <div className="p-4 bg-emerald-50/70 border border-emerald-100 rounded-xl text-xs text-emerald-950 space-y-2">
+              <div className="flex items-center gap-1.5 font-bold text-emerald-900">
+                <ShieldCheck className="w-4 h-4 text-emerald-700" />
+                <span>Admin Management</span>
+              </div>
               <p className="text-emerald-800 leading-relaxed">
-                Keeping track of your Ticket ID enables you to follow municipal progress and check back until the issue is safely resolved.
+                Need to update the status of this ticket? Use the Administrator Dashboard to mark it In Progress or Resolved.
               </p>
+              <Link
+                to="/admin"
+                className="inline-block mt-1 font-semibold text-emerald-700 hover:text-emerald-900 underline underline-offset-2"
+              >
+                Go to Administrator Dashboard &rarr;
+              </Link>
             </div>
           </div>
         </div>

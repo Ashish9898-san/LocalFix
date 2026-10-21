@@ -1,12 +1,5 @@
 /**
- * Sample report data for LocalFix (Phase 1)
- *
- * This module provides initial mockup data to demonstrate:
- * - Browsing reports
- * - Searching by keywords
- * - Filtering by category and status
- * - Report details view
- * - Dashboard statistics calculation
+ * Sample report data for LocalFix (Phase 2)
  *
  * Schema:
  * - id: Unique string identifier (e.g., 'REP-101')
@@ -17,6 +10,7 @@
  * - status: 'PENDING' | 'IN_PROGRESS' | 'RESOLVED'
  * - createdAt: ISO 8601 timestamp string
  * - priority: 'Low' | 'Medium' | 'High'
+ * - imageUrl: (optional) URL or base64 image data string
  */
 
 export const INITIAL_SAMPLE_REPORTS = [
@@ -29,6 +23,7 @@ export const INITIAL_SAMPLE_REPORTS = [
     status: 'IN_PROGRESS',
     createdAt: '2026-10-18T09:15:00Z',
     priority: 'High',
+    imageUrl: 'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?auto=format&fit=crop&w=800&q=80',
   },
   {
     id: 'REP-102',
@@ -39,6 +34,7 @@ export const INITIAL_SAMPLE_REPORTS = [
     status: 'PENDING',
     createdAt: '2026-10-19T14:40:00Z',
     priority: 'Medium',
+    imageUrl: 'https://images.unsplash.com/photo-1605600659908-0ef719419d41?auto=format&fit=crop&w=800&q=80',
   },
   {
     id: 'REP-103',
@@ -49,6 +45,7 @@ export const INITIAL_SAMPLE_REPORTS = [
     status: 'RESOLVED',
     createdAt: '2026-10-14T18:20:00Z',
     priority: 'Medium',
+    imageUrl: 'https://images.unsplash.com/photo-1516726817505-f5ed825624d8?auto=format&fit=crop&w=800&q=80',
   },
   {
     id: 'REP-104',
@@ -59,6 +56,7 @@ export const INITIAL_SAMPLE_REPORTS = [
     status: 'IN_PROGRESS',
     createdAt: '2026-10-20T07:50:00Z',
     priority: 'High',
+    imageUrl: 'https://images.unsplash.com/photo-1584467735871-8e85353a8413?auto=format&fit=crop&w=800&q=80',
   },
   {
     id: 'REP-105',
@@ -69,6 +67,7 @@ export const INITIAL_SAMPLE_REPORTS = [
     status: 'PENDING',
     createdAt: '2026-10-20T16:10:00Z',
     priority: 'Low',
+    imageUrl: null,
   },
   {
     id: 'REP-106',
@@ -79,6 +78,7 @@ export const INITIAL_SAMPLE_REPORTS = [
     status: 'PENDING',
     createdAt: '2026-10-21T08:00:00Z',
     priority: 'High',
+    imageUrl: null,
   },
   {
     id: 'REP-107',
@@ -89,6 +89,7 @@ export const INITIAL_SAMPLE_REPORTS = [
     status: 'IN_PROGRESS',
     createdAt: '2026-10-17T19:05:00Z',
     priority: 'Medium',
+    imageUrl: null,
   },
   {
     id: 'REP-108',
@@ -99,6 +100,7 @@ export const INITIAL_SAMPLE_REPORTS = [
     status: 'RESOLVED',
     createdAt: '2026-10-15T11:30:00Z',
     priority: 'Low',
+    imageUrl: null,
   }
 ];
 

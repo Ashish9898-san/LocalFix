@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ReportsProvider } from './context/ReportsContext';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
@@ -8,6 +8,7 @@ import Reports from './pages/Reports';
 import ReportIssue from './pages/ReportIssue';
 import ReportDetails from './pages/ReportDetails';
 import Dashboard from './pages/Dashboard';
+import AdminDashboard from './pages/AdminDashboard';
 import EmptyState from './components/EmptyState';
 
 function NotFoundPage() {
@@ -36,9 +37,12 @@ export default function App() {
             <Routes>
               <Route path="/" element={<Home />} />
               <Route path="/reports" element={<Reports />} />
+              <Route path="/browse-reports" element={<Navigate to="/reports" replace />} />
               <Route path="/reports/:id" element={<ReportDetails />} />
               <Route path="/report-issue" element={<ReportIssue />} />
+              <Route path="/create-report" element={<Navigate to="/report-issue" replace />} />
               <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/admin" element={<AdminDashboard />} />
               <Route path="*" element={<NotFoundPage />} />
             </Routes>
           </main>
