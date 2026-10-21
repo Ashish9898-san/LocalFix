@@ -7,10 +7,10 @@ LocalFix is a full-stack civic web platform where citizens can report local infr
 ## Technology Stack
 
 - **Frontend:** React 18, Vite, React Router, Tailwind CSS, Lucide React
-- **Backend (Phase 3+):** Java 21, Spring Boot 3, Maven
+- **Backend:** Java 21, Spring Boot 3.3.4, Maven
 - **Database (Phase 4+):** MySQL 8
-- **ORM & Data Access:** Spring Data JPA with Hibernate
-- **API Client:** Axios (Integrated in Phase 6)
+- **ORM & Data Access (Phase 4+):** Spring Data JPA with Hibernate
+- **API Client (Phase 6):** Axios
 
 ---
 
@@ -21,62 +21,61 @@ LocalFix/
 ├── frontend/                     # React + Vite application
 │   ├── public/                   # Static public assets
 │   ├── src/
-│   │   ├── components/           # Reusable UI components
-│   │   │   ├── Navbar.jsx        # Navigation bar with responsive drawer and Admin link
-│   │   │   ├── Footer.jsx        # App footer with links and civic tips
-│   │   │   ├── ReportCard.jsx    # Card displaying summary of an issue with image support
-│   │   │   ├── SearchFilters.jsx # Reusable search, filter, and sorting toolbar
-│   │   │   ├── StatusBadge.jsx   # Accessible, color-coded status badge
-│   │   │   ├── Loading.jsx       # Animated accessible loading indicator
-│   │   │   ├── ErrorMessage.jsx  # Alert banner with retry support
-│   │   │   └── EmptyState.jsx    # Friendly empty/no-results indicator
-│   │   ├── pages/                # Main application views
-│   │   │   ├── Home.jsx          # Public landing page with hero & workflow
-│   │   │   ├── Reports.jsx       # Browse, search, filter, and sort reports
-│   │   │   ├── ReportIssue.jsx   # Form to submit issue with validation & photo attachment
-│   │   │   ├── ReportDetails.jsx # Detailed report view with photo and status timeline
-│   │   │   ├── Dashboard.jsx     # Dynamic statistics, category & status breakdown
-│   │   │   └── AdminDashboard.jsx# Admin report management & status update simulation
-│   │   ├── context/
-│   │   │   └── ReportsContext.jsx# Shared state, status updater, and localStorage persistence
-│   │   ├── data/
-│   │   │   └── sampleReports.js  # Sample reports with categories, statuses, and photo links
-│   │   ├── utils/
-│   │   │   └── reportUtils.js    # Date formatting, image validation, and filter/sort logic
-│   │   ├── App.jsx               # Route definitions and layout wrapper
-│   │   ├── main.jsx              # React DOM entry point
+│   │   ├── components/           # Reusable UI components (Navbar, ReportCard, SearchFilters, etc.)
+│   │   ├── pages/                # Pages (Home, Reports, ReportIssue, ReportDetails, Dashboard, AdminDashboard)
+│   │   ├── context/              # ReportsContext state manager & localStorage sync
+│   │   ├── data/                 # Sample mock reports
+│   │   ├── utils/                # Date formatters, image validators, filter/sort logic
+│   │   ├── App.jsx               # Application routes
+│   │   ├── main.jsx              # React DOM entry
 │   │   └── index.css             # Tailwind base & utilities
 │   ├── package.json
-│   ├── tailwind.config.js
-│   ├── vite.config.js
-│   └── README.md
+│   └── vite.config.js
 │
-├── backend/                      # Spring Boot backend (Phase 3+)
-├── .gitignore                    # Excludes node_modules, target, .env, secrets
+├── backend/                      # Spring Boot + Maven application
+│   ├── src/
+│   │   ├── main/
+│   │   │   ├── java/com/localfix/
+│   │   │   │   ├── LocalFixApplication.java # Spring Boot application entry point
+│   │   │   │   ├── controller/              # REST Controllers (HealthController)
+│   │   │   │   └── dto/                     # Data Transfer Objects (HealthResponse)
+│   │   │   └── resources/
+│   │   │       └── application.properties   # Backend application configuration
+│   │   └── test/
+│   │       └── java/com/localfix/
+│   │           └── LocalFixApplicationTests.java # Context load and MockMvc REST tests
+│   ├── pom.xml                   # Maven dependencies and build definition
+│   └── .gitignore
+│
+├── .gitignore                    # Root ignore for node_modules, target, .env, secrets
 └── README.md
 ```
 
 ---
 
-## How to Run the Frontend Locally
+## How to Run the Applications Locally
 
-1. Ensure **Node.js** (v18+) and **npm** (v9+) are installed.
-2. Change into the frontend directory:
-   ```bash
-   cd frontend
-   ```
-3. Install dependencies (if not already done):
-   ```bash
-   npm install
-   ```
-4. Start the development server:
-   ```bash
-   npm run dev
-   ```
-5. Open your browser at:
-   ```text
-   http://localhost:5173
-   ```
+### 1. Frontend (React + Vite)
+```bash
+cd frontend
+npm install   # If not already installed
+npm run dev
+```
+Open **`http://localhost:5173`** in your browser.
+
+### 2. Backend (Spring Boot + Java 21)
+```bash
+cd backend
+mvn spring-boot:run
+```
+Alternatively, run the packaged JAR directly:
+```bash
+java -jar target/localfix-backend-0.0.1-SNAPSHOT.jar
+```
+The server starts on port **`8080`**. Test the health check endpoint:
+```bash
+curl -i http://localhost:8080/api/health
+```
 
 ---
 
@@ -85,7 +84,7 @@ LocalFix/
 - [x] **Phase 0:** Environment inspection, architecture, and planning.
 - [x] **Phase 1:** Initial frontend scaffolding, layout, and mock structure.
 - [x] **Phase 2:** Complete frontend reporting interface (Search, Filters, Photo Upload preview, Report Details, Dynamic Dashboard, Admin Panel).
-- [ ] **Phase 3:** Spring Boot Foundation (Java 21, Maven, health endpoint).
+- [x] **Phase 3:** Spring Boot Foundation (Java 21, Maven, Spring Boot 3.3.4, Health REST controller, MockMvc tests).
 - [ ] **Phase 4:** MySQL Database Integration (JPA Entities & Repository).
 - [ ] **Phase 5:** REST API Development (Report CRUD, Search & Filtering endpoints).
 - [ ] **Phase 6:** Frontend and Backend Integration (Axios client, live API integration).
