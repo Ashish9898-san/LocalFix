@@ -37,13 +37,21 @@ LocalFix/
 │   │   ├── main/
 │   │   │   ├── java/com/localfix/
 │   │   │   │   ├── LocalFixApplication.java # Spring Boot application entry point
-│   │   │   │   ├── controller/              # REST Controllers (HealthController)
-│   │   │   │   └── dto/                     # Data Transfer Objects (HealthResponse)
+│   │   │   │   ├── controller/              # REST Controllers (HealthController, ReportController)
+│   │   │   │   ├── dto/                     # Data Transfer Objects (Create, Update, Response, Health)
+│   │   │   │   ├── entity/                  # JPA Entities & Enums (Report, DatabaseCheck, Enums)
+│   │   │   │   ├── exception/               # GlobalExceptionHandler, ErrorResponse, Custom Exceptions
+│   │   │   │   ├── repository/              # Spring Data JPA Repositories (ReportRepository, DatabaseCheckRepository)
+│   │   │   │   └── service/                 # Transactional Business Services (ReportService)
 │   │   │   └── resources/
-│   │   │       └── application.properties   # Backend application configuration
+│   │   │       ├── application.properties   # Backend application configuration
+│   │   │       └── application-local.properties.example # Template for local credentials
 │   │   └── test/
 │   │       └── java/com/localfix/
-│   │           └── LocalFixApplicationTests.java # Context load and MockMvc REST tests
+│   │           ├── LocalFixApplicationTests.java # Context load and JPA integration tests
+│   │           ├── controller/              # WebMvcTest slice tests (HealthControllerTest, ReportControllerTest)
+│   │           └── service/                 # Mockito unit tests (ReportServiceTest)
+│   ├── LocalFix_Phase5_Postman_Collection.json # Importable Postman API test collection
 │   ├── pom.xml                   # Maven dependencies and build definition
 │   └── .gitignore
 │
@@ -72,9 +80,31 @@ Alternatively, run the packaged JAR directly:
 ```bash
 java -jar target/localfix-backend-0.0.1-SNAPSHOT.jar
 ```
-The server starts on port **`8080`**. Test the health check endpoint:
+The server starts on port **`8080`**. Test the endpoints:
 ```bash
+# Health checks
 curl -i http://localhost:8080/api/health
+curl -i http://localhost:8080/api/health/db
+
+# Create a report (Phase 5)
+curl -i -X POST http://localhost:8080/api/reports \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Large pothole on 5th Avenue",
+    "description": "Hazardous road pothole damaging vehicles in right lane.",
+    "category": "ROADS",
+    "severity": "HIGH",
+    "location": "5th Ave & Market St"
+  }'
+
+# List all reports
+curl -s http://localhost:8080/api/reports
+```
+
+### 3. Run Backend Automated Tests
+```bash
+cd backend
+mvn test -Dtest=ReportServiceTest,ReportControllerTest,HealthControllerTest
 ```
 
 ---
@@ -85,8 +115,8 @@ curl -i http://localhost:8080/api/health
 - [x] **Phase 1:** Initial frontend scaffolding, layout, and mock structure.
 - [x] **Phase 2:** Complete frontend reporting interface (Search, Filters, Photo Upload preview, Report Details, Dynamic Dashboard, Admin Panel).
 - [x] **Phase 3:** Spring Boot Foundation (Java 21, Maven, Spring Boot 3.3.4, Health REST controller, MockMvc tests).
-- [ ] **Phase 4:** MySQL Database Integration (JPA Entities & Repository).
-- [ ] **Phase 5:** REST API Development (Report CRUD, Search & Filtering endpoints).
+- [x] **Phase 4:** MySQL Database Integration (JPA Entities & Repository).
+- [x] **Phase 5:** REST API Development (Report CRUD, Search & Filtering endpoints, validation, error handling, 22 passing tests).
 - [ ] **Phase 6:** Frontend and Backend Integration (Axios client, live API integration).
 - [ ] **Phase 7:** Spring Security & Role-Based Authorization.
 - [ ] **Phase 8:** Final Testing, Error Handling, and Deployment Documentation.
