@@ -1,0 +1,10 @@
+# ===================================================================
+# Local Database Configuration Template (LocalFix Phase 4)
+# ===================================================================
+# To configure your local database password securely without committing it to Git:
+# 1. Copy this file to: backend/src/main/resources/application-local.properties
+# 2. Fill in your MySQL password below
+# 3. application-local.properties is already listed in .gitignore and will never be committed.
+
+spring.datasource.username=root
+spring.datasource.password=YOUR_MYSQL_PASSWORD_HERE
