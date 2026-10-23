@@ -1,7 +1,12 @@
 package com.localfix;
 
 import com.localfix.entity.DatabaseCheck;
+import com.localfix.entity.Report;
+import com.localfix.entity.ReportCategory;
+import com.localfix.entity.ReportSeverity;
+import com.localfix.entity.ReportStatus;
 import com.localfix.repository.DatabaseCheckRepository;
+import com.localfix.repository.ReportRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,6 +37,9 @@ class LocalFixApplicationTests {
 
     @Autowired(required = false)
     private DatabaseCheckRepository databaseCheckRepository;
+
+    @Autowired(required = false)
+    private ReportRepository reportRepository;
 
     @Test
     @DisplayName("Application Context Loads Successfully")
@@ -75,5 +83,36 @@ class LocalFixApplicationTests {
         // 4. Clean up test record so the database remains clean
         databaseCheckRepository.deleteById(saved.getId());
         assertThat(databaseCheckRepository.findById(saved.getId())).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Verify Report entity persistence, retrieval, status update, and cleanup in MySQL")
+    void testReportEntityPersistence() {
+        if (reportRepository == null) {
+            return;
+        }
+
+        Report report = new Report(
+                "Integration Test Pothole",
+                "Testing real database persistence for Report entity",
+                ReportCategory.ROADS,
+                ReportSeverity.HIGH,
+                "Main St & 2nd Ave",
+                "https://example.com/test.jpg"
+        );
+
+        Report saved = reportRepository.save(report);
+        assertThat(saved.getId()).isNotNull();
+        assertThat(saved.getStatus()).isEqualTo(ReportStatus.PENDING);
+        assertThat(saved.getCreatedAt()).isNotNull();
+
+        // Update status
+        saved.setStatus(ReportStatus.IN_PROGRESS);
+        Report updated = reportRepository.save(saved);
+        assertThat(updated.getStatus()).isEqualTo(ReportStatus.IN_PROGRESS);
+
+        // Clean up test record
+        reportRepository.deleteById(saved.getId());
+        assertThat(reportRepository.findById(saved.getId())).isEmpty();
     }
 }
