@@ -1,0 +1,176 @@
+import axios from 'axios';
+
+/**
+ * api.js - Centralized Axios HTTP Client for LocalFix
+ *
+ * Concepts Explained for Beginners:
+ * 1. Axios: A promise-based HTTP client that sends requests from the browser
+ *    to the backend REST API and automatically transforms JSON payloads.
+ * 2. baseURL: The root path prefix applied to all relative requests (e.g., '/reports').
+ * 3. Environment Variables: Vite exposes variables prefixed with 'VITE_' via
+ *    import.meta.env. We provide a safe default ('http://localhost:8080/api')
+ *    so development works out of the box.
+ * 4. Interceptors: Middleware that inspects or transforms requests before they leave
+ *    and responses before they reach the component.
+ */
+
+// Read base URL from Vite environment, falling back to local Spring Boot port 8080
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+
+const apiClient = axios.create({
+  baseURL: API_BASE_URL,
+  timeout: 10000, // 10 second timeout
+  headers: {
+    'Content-Type': 'application/json',
+    Accept: 'application/json',
+  },
+});
+
+/**
+ * Global response interceptor:
+ * Extracts helpful error details from server responses or network failures,
+ * normalizing them so UI components can display clean user-friendly alerts.
+ */
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    let normalizedError = {
+      status: error.response?.status || 0,
+      message: 'An unexpected error occurred.',
+      fieldErrors: {},
+      isNetworkError: false,
+    };
+
+    if (!error.response) {
+      // Server is unreachable, network connection lost, or CORS blocked
+      normalizedError.isNetworkError = true;
+      normalizedError.message =
+        'Cannot connect to the LocalFix backend server. Please verify that Spring Boot is running on port 8080.';
+    } else {
+      const data = error.response.data;
+      const status = error.response.status;
+
+      if (status === 400) {
+        normalizedError.message = data?.message || 'Invalid request. Please check the entered data.';
+        // If Spring Boot GlobalExceptionHandler returned field errors:
+        if (data?.errors && typeof data.errors === 'object') {
+          normalizedError.fieldErrors = data.errors;
+        }
+      } else if (status === 403) {
+        normalizedError.message =
+          data?.message || 'Access Denied: Administrator credentials are required to perform this action.';
+      } else if (status === 404) {
+        normalizedError.message = data?.message || 'The requested report was not found.';
+      } else if (status === 500) {
+        normalizedError.message =
+          'A server-side error occurred. Please try again later or check backend logs.';
+      } else {
+        normalizedError.message = data?.message || `Request failed with HTTP status ${status}.`;
+      }
+    }
+
+    return Promise.reject(normalizedError);
+  }
+);
+
+/**
+ * Report API Endpoints
+ */
+export const reportsApi = {
+  /**
+   * GET /api/reports
+   * Fetches all reports, ordered newest first.
+   * Supports optional query filtering by category and status.
+   */
+  getAll: async (params = {}) => {
+    const response = await apiClient.get('/reports', { params });
+    return response.data;
+  },
+
+  /**
+   * GET /api/reports/{id}
+   * Fetches a single report by its unique ID.
+   */
+  getById: async (id) => {
+    const response = await apiClient.get(`/reports/${id}`);
+    return response.data;
+  },
+
+  /**
+   * POST /api/reports
+   * Creates a new civic report in the database.
+   * Expects: { title, description, category, severity, location, imageUrl }
+   */
+  create: async (reportData) => {
+    const response = await apiClient.post('/reports', reportData);
+    return response.data;
+  },
+
+  /**
+   * PATCH /api/reports/{id}
+   * Partially updates an existing report's status or details.
+   * Sends X-Admin-Role: ADMIN to authenticate administrative access.
+   * Expects: { status?: 'PENDING'|'IN_PROGRESS'|'RESOLVED', severity?, ... }
+   */
+  update: async (id, updateData) => {
+    const response = await apiClient.patch(`/reports/${id}`, updateData, {
+      headers: {
+        'X-Admin-Role': 'ADMIN',
+      },
+    });
+    return response.data;
+  },
+
+  /**
+   * POST /api/reports/images
+   * Upload an image file via multipart/form-data (Phase 8).
+   * @param {File} file - Selected image File object
+   * @returns {Promise<{ imageUrl: string, fileName: string, fileSize: number, contentType: string }>}
+   */
+  uploadImage: async (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await apiClient.post('/reports/images', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
+  /**
+   * Helper to format an image URL for frontend rendering.
+   * Resolves backend-relative paths (e.g. /api/reports/images/xyz.jpg)
+   * to full URLs against the Spring Boot host (http://localhost:8080),
+   * while preserving external URLs (https://...) and data URIs (data:...).
+   */
+  formatImageUrl: (imageUrl) => {
+    if (!imageUrl) return null;
+    if (
+      imageUrl.startsWith('http://') ||
+      imageUrl.startsWith('https://') ||
+      imageUrl.startsWith('data:') ||
+      imageUrl.startsWith('blob:')
+    ) {
+      return imageUrl;
+    }
+    const baseHost = API_BASE_URL.replace(/\/api\/?$/, '');
+    return `${baseHost}${imageUrl.startsWith('/') ? '' : '/'}${imageUrl}`;
+  },
+
+  /**
+   * Health endpoints for backend connectivity verification
+   */
+  getHealth: async () => {
+    const response = await apiClient.get('/health');
+    return response.data;
+  },
+
+  getDbHealth: async () => {
+    const response = await apiClient.get('/health/db');
+    return response.data;
+  },
+};
+
+export default apiClient;

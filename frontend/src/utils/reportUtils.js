@@ -4,6 +4,26 @@
  * Helper functions for report formatting, validation, and filtering.
  */
 
+export const CATEGORY_LABELS = {
+  ROADS: 'Roads',
+  GARBAGE: 'Garbage',
+  STREETLIGHTS: 'Streetlights',
+  WATER_LEAKAGE: 'Water Leakage',
+  PUBLIC_PROPERTY: 'Public Property',
+  OTHER: 'Other',
+};
+
+/**
+ * Format a category enum key into a clean, human-readable label
+ * @param {string} category - e.g. "WATER_LEAKAGE" or "Water Leakage"
+ * @returns {string} e.g. "Water Leakage"
+ */
+export function formatCategory(category) {
+  if (!category) return 'Other';
+  const upper = String(category).toUpperCase().replace(/ /g, '_');
+  return CATEGORY_LABELS[upper] || category;
+}
+
 /**
  * Format an ISO date string into a readable local date
  * @param {string} dateString - ISO 8601 date string
@@ -52,7 +72,7 @@ export function validateImageFile(file) {
   if (!file) return { valid: true };
 
   const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-  const maxSizeBytes = 2 * 1024 * 1024; // 2 MB limit for browser memory
+  const maxSizeBytes = 5 * 1024 * 1024; // 5 MB limit for photo attachments
 
   if (!validTypes.includes(file.type)) {
     return {
@@ -64,7 +84,7 @@ export function validateImageFile(file) {
   if (file.size > maxSizeBytes) {
     return {
       valid: false,
-      error: 'Image size exceeds 2 MB. Please select a smaller photo.',
+      error: 'Image size exceeds 5 MB. Please select a smaller photo.',
     };
   }
 
@@ -72,7 +92,8 @@ export function validateImageFile(file) {
 }
 
 /**
- * Filter and sort a list of reports based on criteria
+ * Filter and sort a list of reports based on criteria.
+ * Safely handles numeric or string IDs, case variations in categories and statuses.
  * @param {Array} reports - Array of report objects
  * @param {Object} filters - { searchQuery, category, status, locationQuery, sortBy }
  * @returns {Array} Filtered and sorted reports
@@ -84,31 +105,51 @@ export function filterAndSortReports(reports, {
   locationQuery = '',
   sortBy = 'newest'
 } = {}) {
+  if (!Array.isArray(reports)) return [];
+
   const query = (searchQuery || '').trim().toLowerCase();
   const locQuery = (locationQuery || '').trim().toLowerCase();
 
   return reports
     .filter((report) => {
-      // Keyword search (searches title, description, and ID)
-      const matchesSearch = !query ||
-        report.title.toLowerCase().includes(query) ||
-        report.description.toLowerCase().includes(query) ||
-        report.id.toLowerCase().includes(query);
+      if (!report) return false;
 
-      // Category filter
-      const matchesCategory = category === 'All' || report.category === category;
+      // Safe string conversions for keyword search (searches title, description, and ID)
+      const reportTitle = String(report.title || '').toLowerCase();
+      const reportDesc = String(report.description || '').toLowerCase();
+      const reportId = String(report.id || '').toLowerCase();
+
+      const matchesSearch =
+        !query ||
+        reportTitle.includes(query) ||
+        reportDesc.includes(query) ||
+        reportId.includes(query);
+
+      // Category filter (handles both uppercase enum like "ROADS" and formatted label like "Roads")
+      const reportCatUpper = String(report.category || '').toUpperCase().replace(/ /g, '_');
+      const filterCatUpper = String(category || '').toUpperCase().replace(/ /g, '_');
+      const matchesCategory =
+        category === 'All' ||
+        report.category === category ||
+        reportCatUpper === filterCatUpper;
 
       // Status filter
-      const matchesStatus = status === 'All' || report.status === status;
+      const reportStatusUpper = String(report.status || '').toUpperCase();
+      const filterStatusUpper = String(status || '').toUpperCase();
+      const matchesStatus =
+        status === 'All' ||
+        report.status === status ||
+        reportStatusUpper === filterStatusUpper;
 
       // Location filter
-      const matchesLocation = !locQuery || report.location.toLowerCase().includes(locQuery);
+      const reportLoc = String(report.location || '').toLowerCase();
+      const matchesLocation = !locQuery || reportLoc.includes(locQuery);
 
       return matchesSearch && matchesCategory && matchesStatus && matchesLocation;
     })
     .sort((a, b) => {
-      const dateA = new Date(a.createdAt).getTime();
-      const dateB = new Date(b.createdAt).getTime();
+      const dateA = new Date(a.createdAt).getTime() || 0;
+      const dateB = new Date(b.createdAt).getTime() || 0;
       return sortBy === 'newest' ? dateB - dateA : dateA - dateB;
     });
 }

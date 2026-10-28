@@ -34,6 +34,10 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# Uploaded Files & User Media (Phase 8 Image Uploads)
+uploads/
+**/uploads/
+
 
 # IntelliJ IDEA project settings
 .idea/

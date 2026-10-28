@@ -181,11 +181,27 @@ export default function Home() {
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {recentReports.map((report) => (
-            <ReportCard key={report.id} report={report} />
-          ))}
-        </div>
+        {recentReports.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {recentReports.map((report) => (
+              <ReportCard key={report.id} report={report} />
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-12 px-4 bg-white rounded-2xl border border-gray-200/80 shadow-sm space-y-3">
+            <p className="text-base font-semibold text-gray-700">No reports submitted to the database yet.</p>
+            <p className="text-xs text-gray-500 max-w-md mx-auto">
+              Our civic tracking system is live and ready for community submissions.
+            </p>
+            <Link
+              to="/report-issue"
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-sm transition-colors mt-2"
+            >
+              <PlusCircle className="w-3.5 h-3.5" />
+              <span>Submit the First Report</span>
+            </Link>
+          </div>
+        )}
       </section>
     </div>
   );

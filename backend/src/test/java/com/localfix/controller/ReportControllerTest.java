@@ -1,7 +1,9 @@
 package com.localfix.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.localfix.config.WebConfig;
 import com.localfix.dto.CreateReportRequest;
+import com.localfix.dto.ImageUploadResponse;
 import com.localfix.dto.ReportResponse;
 import com.localfix.dto.UpdateReportRequest;
 import com.localfix.entity.ReportCategory;
@@ -9,6 +11,8 @@ import com.localfix.entity.ReportSeverity;
 import com.localfix.entity.ReportStatus;
 import com.localfix.exception.GlobalExceptionHandler;
 import com.localfix.exception.ResourceNotFoundException;
+import com.localfix.security.AdminAuthInterceptor;
+import com.localfix.service.FileStorageService;
 import com.localfix.service.ReportService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -16,7 +20,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
@@ -37,7 +45,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * Does not initialize real database or Hikari connection pool.
  */
 @WebMvcTest(ReportController.class)
-@Import(GlobalExceptionHandler.class)
+@Import({GlobalExceptionHandler.class, WebConfig.class, AdminAuthInterceptor.class})
 class ReportControllerTest {
 
     @Autowired
@@ -48,6 +56,9 @@ class ReportControllerTest {
 
     @MockBean
     private ReportService reportService;
+
+    @MockBean
+    private FileStorageService fileStorageService;
 
     private ReportResponse sampleResponse(Long id, String title, ReportCategory category,
                                           ReportSeverity severity, ReportStatus status) {
@@ -156,6 +167,37 @@ class ReportControllerTest {
     }
 
     @Test
+    @DisplayName("POST /api/reports with large base64 image payload succeeds without truncation error")
+    void createReport_withLargeBase64Image_success() throws Exception {
+        // Generate a Base64 string > 65 KB to simulate realistic photo attachment (> 65,535 bytes)
+        String largeBase64 = "data:image/jpeg;base64," + "A".repeat(80000);
+        CreateReportRequest request = new CreateReportRequest(
+                "Flooded intersection near school",
+                "Clean water leaking from burst pipe flooding school entrance",
+                ReportCategory.WATER_LEAKAGE,
+                ReportSeverity.HIGH,
+                "Maple St & 5th Ave",
+                largeBase64
+        );
+
+        ReportResponse created = new ReportResponse(
+                55L, request.title(), request.description(), request.category(),
+                request.severity(), request.location(), ReportStatus.PENDING,
+                largeBase64, Instant.now(), Instant.now()
+        );
+        when(reportService.createReport(any(CreateReportRequest.class))).thenReturn(created);
+
+        mockMvc.perform(post("/api/reports")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(header().string("Location", containsString("/api/reports/55")))
+                .andExpect(jsonPath("$.id").value(55))
+                .andExpect(jsonPath("$.title").value(request.title()))
+                .andExpect(jsonPath("$.imageUrl").value(largeBase64));
+    }
+
+    @Test
     @DisplayName("POST /api/reports with blank title and missing category returns 400 Bad Request with field errors")
     void createReport_validationFailure() throws Exception {
         // Missing category, blank title, short description (< 10 chars)
@@ -199,8 +241,24 @@ class ReportControllerTest {
     }
 
     @Test
-    @DisplayName("PATCH /api/reports/{id} updates report and returns 200 OK")
-    void updateReport_success() throws Exception {
+    @DisplayName("PATCH /api/reports/{id} without admin role returns 403 Forbidden")
+    void updateReport_unauthorizedWithoutAdminRole() throws Exception {
+        UpdateReportRequest request = new UpdateReportRequest(
+                null, null, null, null, null, ReportStatus.IN_PROGRESS, null
+        );
+
+        mockMvc.perform(patch("/api/reports/1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value(403))
+                .andExpect(jsonPath("$.error").value("Forbidden"))
+                .andExpect(jsonPath("$.message", containsString("Administrator role credentials")));
+    }
+
+    @Test
+    @DisplayName("PATCH /api/reports/{id} with admin credentials updates report and returns 200 OK")
+    void updateReport_authorizedSuccess() throws Exception {
         UpdateReportRequest request = new UpdateReportRequest(
                 null,
                 null,
@@ -215,6 +273,7 @@ class ReportControllerTest {
         when(reportService.updateReport(eq(1L), any(UpdateReportRequest.class))).thenReturn(updated);
 
         mockMvc.perform(patch("/api/reports/1")
+                .header("X-Admin-Role", "ADMIN")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
@@ -231,10 +290,119 @@ class ReportControllerTest {
                 .thenThrow(new ResourceNotFoundException("Report", "id", 999L));
 
         mockMvc.perform(patch("/api/reports/999")
+                .header("X-Admin-Role", "ADMIN")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value(404))
                 .andExpect(jsonPath("$.error").value("Not Found"));
+    }
+
+    @Test
+    @DisplayName("PATCH /api/reports/{id} with invalid workflow transition returns 400 Bad Request")
+    void updateReport_invalidWorkflowTransition() throws Exception {
+        UpdateReportRequest request = new UpdateReportRequest(null, null, null, null, null, ReportStatus.PENDING, null);
+        when(reportService.updateReport(eq(1L), any(UpdateReportRequest.class)))
+                .thenThrow(new IllegalStateException("Invalid status transition: Report #1 cannot transition from [RESOLVED] to [PENDING]."));
+
+        mockMvc.perform(patch("/api/reports/1")
+                .header("X-Admin-Role", "ADMIN")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message", containsString("Invalid status transition")));
+    }
+
+    @Test
+    @DisplayName("PATCH /api/reports/{id} with invalid status enum string returns 400 Bad Request")
+    void updateReport_invalidStatusEnum() throws Exception {
+        String invalidStatusJson = """
+                {
+                    "status": "NONEXISTENT_STATUS"
+                }
+                """;
+
+        mockMvc.perform(patch("/api/reports/1")
+                .header("X-Admin-Role", "ADMIN")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(invalidStatusJson))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400));
+    }
+
+    // =========================================================================
+    // Phase 8: Image Upload & Serving Tests
+    // =========================================================================
+
+    @Test
+    @DisplayName("POST /api/reports/images with valid image returns 201 Created and image URL")
+    void uploadImage_success() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "evidence.jpg",
+                "image/jpeg",
+                "test-image-binary-data".getBytes()
+        );
+
+        ImageUploadResponse uploadResponse = new ImageUploadResponse(
+                "/api/reports/images/test-uuid.jpg",
+                "test-uuid.jpg",
+                (long) "test-image-binary-data".length(),
+                "image/jpeg"
+        );
+
+        when(fileStorageService.storeImage(any())).thenReturn(uploadResponse);
+
+        mockMvc.perform(multipart("/api/reports/images").file(file))
+                .andExpect(status().isCreated())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.imageUrl").value("/api/reports/images/test-uuid.jpg"))
+                .andExpect(jsonPath("$.fileName").value("test-uuid.jpg"))
+                .andExpect(jsonPath("$.fileSize").value("test-image-binary-data".length()))
+                .andExpect(jsonPath("$.contentType").value("image/jpeg"));
+    }
+
+    @Test
+    @DisplayName("POST /api/reports/images with empty file returns 400 Bad Request")
+    void uploadImage_emptyFile() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "empty.jpg",
+                "image/jpeg",
+                new byte[0]
+        );
+
+        when(fileStorageService.storeImage(any()))
+                .thenThrow(new IllegalArgumentException("Failed to store empty image file."));
+
+        mockMvc.perform(multipart("/api/reports/images").file(file))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message", containsString("empty image file")));
+    }
+
+    @Test
+    @DisplayName("GET /api/reports/images/{fileName} returns 200 OK with resource and cache header")
+    void getImage_success() throws Exception {
+        Resource mockResource = new ByteArrayResource("test-image-content".getBytes());
+        when(fileStorageService.loadImageAsResource("photo-123.jpg")).thenReturn(mockResource);
+        when(fileStorageService.probeContentType("photo-123.jpg")).thenReturn("image/jpeg");
+
+        mockMvc.perform(get("/api/reports/images/photo-123.jpg"))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, containsString("max-age=86400")))
+                .andExpect(content().contentType(MediaType.IMAGE_JPEG));
+    }
+
+    @Test
+    @DisplayName("GET /api/reports/images/{fileName} for nonexistent file returns 404 Not Found")
+    void getImage_notFound() throws Exception {
+        when(fileStorageService.loadImageAsResource("nonexistent.jpg"))
+                .thenThrow(new ResourceNotFoundException("Image", "fileName", "nonexistent.jpg"));
+
+        mockMvc.perform(get("/api/reports/images/nonexistent.jpg"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status").value(404));
     }
 }

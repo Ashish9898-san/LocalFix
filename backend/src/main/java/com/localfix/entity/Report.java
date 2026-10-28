@@ -45,7 +45,7 @@ public class Report {
     @Column(nullable = false, length = 30)
     private ReportStatus status = ReportStatus.PENDING;
 
-    @Column(name = "image_url", columnDefinition = "TEXT")
+    @Column(name = "image_url", columnDefinition = "LONGTEXT")
     private String imageUrl;
 
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -67,12 +67,18 @@ public class Report {
         this.location = location;
         this.imageUrl = imageUrl;
         this.status = ReportStatus.PENDING;
+        this.createdAt = Instant.now();
+        this.updatedAt = this.createdAt;
     }
 
     @PrePersist
     protected void onCreate() {
-        this.createdAt = Instant.now();
-        this.updatedAt = this.createdAt;
+        if (this.createdAt == null) {
+            this.createdAt = Instant.now();
+        }
+        if (this.updatedAt == null) {
+            this.updatedAt = this.createdAt;
+        }
         if (this.status == null) {
             this.status = ReportStatus.PENDING;
         }

@@ -7,14 +7,15 @@ import {
   ArrowLeft, 
   Upload, 
   X, 
-  RotateCcw,
-  Info,
-  ExternalLink,
-  Image as ImageIcon
+  RotateCcw, 
+  Info, 
+  ExternalLink, 
+  Image as ImageIcon 
 } from 'lucide-react';
 import { useReports } from '../context/ReportsContext';
 import { CATEGORIES } from '../data/sampleReports';
-import { validateImageFile } from '../utils/reportUtils';
+import { validateImageFile, formatCategory } from '../utils/reportUtils';
+import { reportsApi } from '../services/api';
 
 export default function ReportIssue() {
   const navigate = useNavigate();
@@ -30,7 +31,8 @@ export default function ReportIssue() {
     imageUrl: null,
   });
 
-  // Image preview & file state
+  // Image preview & file state (Phase 8: Multipart file upload)
+  const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const [imageError, setImageError] = useState(null);
 
@@ -41,6 +43,7 @@ export default function ReportIssue() {
   // Submission result state
   const [submittedReport, setSubmittedReport] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState(null);
 
   // Available categories excluding 'All'
   const reportCategories = CATEGORIES.filter((c) => c !== 'All');
@@ -97,7 +100,7 @@ export default function ReportIssue() {
     }
   };
 
-  // Handle image upload and client-side preview
+  // Handle image upload and client-side preview (Phase 8: File object with URL.createObjectURL)
   const handleImageChange = (e) => {
     const file = e.target.files?.[0];
     setImageError(null);
@@ -110,17 +113,19 @@ export default function ReportIssue() {
       return;
     }
 
-    // Convert file to base64 Data URL for local preview and mock persistence
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setImagePreview(reader.result);
-      setFormData((prev) => ({ ...prev, imageUrl: reader.result }));
-    };
-    reader.readAsDataURL(file);
+    setImageFile(file);
+    if (imagePreview) {
+      URL.revokeObjectURL(imagePreview);
+    }
+    setImagePreview(URL.createObjectURL(file));
   };
 
   const handleRemoveImage = () => {
+    if (imagePreview) {
+      URL.revokeObjectURL(imagePreview);
+    }
     setImagePreview(null);
+    setImageFile(null);
     setImageError(null);
     setFormData((prev) => ({ ...prev, imageUrl: null }));
   };
@@ -134,14 +139,20 @@ export default function ReportIssue() {
       priority: 'Medium',
       imageUrl: null,
     });
+    if (imagePreview) {
+      URL.revokeObjectURL(imagePreview);
+    }
     setImagePreview(null);
+    setImageFile(null);
     setImageError(null);
     setErrors({});
     setTouched({});
+    setSubmitError(null);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setSubmitError(null);
 
     setTouched({
       title: true,
@@ -158,14 +169,30 @@ export default function ReportIssue() {
     }
 
     setIsSubmitting(true);
+    try {
+      let finalImageUrl = null;
 
-    // Brief simulation of submission processing
-    setTimeout(() => {
-      const created = addReport(formData);
+      // Phase 8: If citizen attached a photo, upload it as multipart/form-data first
+      if (imageFile) {
+        const uploadResponse = await reportsApi.uploadImage(imageFile);
+        finalImageUrl = uploadResponse.imageUrl;
+      }
+
+      const created = await addReport({
+        ...formData,
+        imageUrl: finalImageUrl,
+      });
       setSubmittedReport(created);
-      setIsSubmitting(false);
       handleResetForm();
-    }, 350);
+    } catch (err) {
+      console.error('Submission failed:', err);
+      setSubmitError(err.message || 'Failed to submit report. Please verify backend connection.');
+      if (err.fieldErrors && Object.keys(err.fieldErrors).length > 0) {
+        setErrors((prev) => ({ ...prev, ...err.fieldErrors }));
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -193,17 +220,18 @@ export default function ReportIssue() {
                 Report Submitted Successfully!
               </h2>
               <p className="text-sm text-emerald-800 leading-relaxed">
-                Thank you for contributing to our community. Your report has been recorded under mock ticket ID{' '}
+                Thank you for contributing to our community. Your report has been saved to the database under ticket ID{' '}
                 <span className="font-mono font-bold text-emerald-900 bg-emerald-200/60 px-1.5 py-0.5 rounded">
-                  {submittedReport.id}
+                  #{submittedReport.id}
                 </span>.
               </p>
             </div>
           </div>
 
           <div className="bg-white rounded-xl p-4 border border-emerald-100 text-xs text-gray-600 space-y-1.5">
+            <p><strong className="text-gray-900">Ticket ID:</strong> #{submittedReport.id}</p>
             <p><strong className="text-gray-900">Title:</strong> {submittedReport.title}</p>
-            <p><strong className="text-gray-900">Category:</strong> {submittedReport.category}</p>
+            <p><strong className="text-gray-900">Category:</strong> {formatCategory(submittedReport.category)}</p>
             <p><strong className="text-gray-900">Location:</strong> {submittedReport.location}</p>
             <p><strong className="text-gray-900">Status:</strong> Pending Review</p>
             {submittedReport.imageUrl && (
@@ -249,13 +277,32 @@ export default function ReportIssue() {
 
           {/* Form */}
           <form onSubmit={handleSubmit} noValidate className="p-6 sm:p-8 space-y-6">
-            {/* Simulation Context Notice */}
-            <div className="flex items-start gap-3 p-3.5 bg-blue-50/70 border border-blue-100 rounded-xl text-xs text-blue-900">
-              <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+            {/* Live API Context Notice */}
+            <div className="flex items-start gap-3 p-3.5 bg-emerald-50/80 border border-emerald-200 rounded-xl text-xs text-emerald-900">
+              <Info className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" />
               <p className="leading-relaxed">
-                <strong>Phase 2 Frontend Simulation:</strong> This submission updates your local frontend state and browser storage. In Phase 6, this form will send HTTP requests to our Spring Boot backend and persist directly into MySQL.
+                <strong>Live API Integration (Phase 6):</strong> This form communicates via Axios with your Spring Boot backend (<code>POST /api/reports</code>). Validated records are persisted permanently to your MySQL database.
               </p>
             </div>
+
+            {/* Error Alert if submission failed */}
+            {submitError && (
+              <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-xl text-xs text-red-900 animate-in fade-in">
+                <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <h4 className="font-bold text-red-950 mb-0.5">Submission Failed</h4>
+                  <p>{submitError}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSubmitError(null)}
+                  className="text-red-500 hover:text-red-700 font-bold"
+                  aria-label="Dismiss error"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
 
             {/* Issue Title */}
             <div>
@@ -447,7 +494,7 @@ export default function ReportIssue() {
                     <span className="font-semibold text-emerald-700 hover:underline">
                       Click to upload an image of the problem
                     </span>
-                    <span className="text-gray-400 text-[11px]">PNG, JPG, or WebP up to 2MB</span>
+                    <span className="text-gray-400 text-[11px]">PNG, JPG, or WebP up to 5MB</span>
                   </label>
                 </div>
               )}
@@ -458,6 +505,10 @@ export default function ReportIssue() {
                   {imageError}
                 </p>
               )}
+
+              <p className="text-[11px] text-gray-400 leading-normal">
+                <em>Note: Photos are uploaded securely via multipart/form-data to the backend file storage, and the image reference is linked to your civic report in MySQL.</em>
+              </p>
             </div>
 
             {/* Submit & Reset Button Bar */}

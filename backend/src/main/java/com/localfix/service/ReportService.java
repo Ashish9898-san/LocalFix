@@ -117,7 +117,15 @@ public class ReportService {
             report.setLocation(request.location().trim());
         }
         if (request.status() != null) {
+            if (!report.getStatus().canTransitionTo(request.status())) {
+                throw new IllegalStateException(String.format(
+                        "Invalid status transition: Report #%d cannot transition from [%s] to [%s]. " +
+                        "A resolved report can only be reopened to [IN_PROGRESS].",
+                        id, report.getStatus(), request.status()
+                ));
+            }
             report.setStatus(request.status());
+            report.setUpdatedAt(java.time.Instant.now());
         }
         if (request.imageUrl() != null) {
             report.setImageUrl(request.imageUrl());

@@ -1,116 +1,171 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { INITIAL_SAMPLE_REPORTS } from '../data/sampleReports';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { reportsApi } from '../services/api';
 
-const LOCAL_STORAGE_KEY = 'localfix_mock_reports_v2';
+/**
+ * ReportsContext.jsx
+ *
+ * Centralized React state management for Civic Issue Reports.
+ *
+ * Concepts Explained for Beginners:
+ * 1. Single Source of Truth: All pages and components (Browse Reports, Dashboard,
+ *    Admin Management, Report Details) share the same live report data from this context.
+ * 2. Asynchronous State: Unlike mock data which was synchronous, real network calls
+ *    have latency and can fail. We maintain 'loading' and 'error' flags so components
+ *    can display spinners, empty states, or error retry banners.
+ * 3. Optimistic vs Real Persistence: Reports are saved in MySQL through our Spring Boot API,
+ *    NOT in temporary browser localStorage.
+ */
 
 const ReportsContext = createContext(null);
 
 export const ReportsProvider = ({ children }) => {
-  // Initialize state from browser localStorage if available, or fall back to initial sample reports
-  const [reports, setReports] = useState(() => {
-    try {
-      const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
-        }
-      }
-    } catch (e) {
-      console.warn('Failed to parse reports from localStorage, falling back to sample data.', e);
-    }
-    return INITIAL_SAMPLE_REPORTS;
-  });
+  const [reports, setReports] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
 
-  // Save to localStorage whenever reports change (persisting locally across browser refreshes)
+  /**
+   * Fetch all reports from Spring Boot (GET /api/reports)
+   * Ordered newest first by default.
+   */
+  const fetchReports = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await reportsApi.getAll();
+      setReports(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('Error fetching reports from API:', err);
+      setError(err.message || 'Failed to load reports from server.');
+      setReports([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Fetch reports on initial application startup
   useEffect(() => {
+    fetchReports();
+  }, [fetchReports]);
+
+  /**
+   * Normalize category value to Spring Boot enum name
+   * e.g. "Water Leakage" -> "WATER_LEAKAGE"
+   */
+  const normalizeCategory = (cat) => {
+    if (!cat) return 'OTHER';
+    return String(cat).toUpperCase().replace(/ /g, '_');
+  };
+
+  /**
+   * Normalize severity value to Spring Boot enum name
+   * e.g. "High" -> "HIGH"
+   */
+  const normalizeSeverity = (sev) => {
+    if (!sev) return 'MEDIUM';
+    const upper = String(sev).toUpperCase();
+    if (['LOW', 'MEDIUM', 'HIGH'].includes(upper)) return upper;
+    return 'MEDIUM';
+  };
+
+  /**
+   * Submit a new civic issue report (POST /api/reports)
+   * @param {Object} reportData - Form data
+   * @returns {Promise<Object>} Created report from backend
+   */
+  const addReport = async (reportData) => {
+    setIsSubmitting(true);
     try {
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(reports));
-    } catch (e) {
-      console.warn('Failed to save reports to localStorage', e);
+      const payload = {
+        title: reportData.title.trim(),
+        description: reportData.description.trim(),
+        category: normalizeCategory(reportData.category),
+        severity: normalizeSeverity(reportData.severity || reportData.priority),
+        location: reportData.location.trim(),
+        imageUrl: reportData.imageUrl || null,
+      };
+
+      const createdReport = await reportsApi.create(payload);
+
+      // Prepend newly created report to our live list (newest first)
+      setReports((prev) => [createdReport, ...prev]);
+      return createdReport;
+    } catch (err) {
+      console.error('Failed to create report:', err);
+      throw err; // Re-throw so caller can display form-specific error alert
+    } finally {
+      setIsSubmitting(false);
     }
-  }, [reports]);
-
-  /**
-   * Add a newly submitted report to the local state
-   * @param {Object} reportData - { title, description, category, location, priority, imageUrl }
-   * @returns {Object} newly created report with generated id, status, and timestamp
-   */
-  const addReport = (reportData) => {
-    const newId = `REP-${Math.floor(1000 + Math.random() * 9000)}`;
-    const newReport = {
-      id: newId,
-      title: reportData.title.trim(),
-      description: reportData.description.trim(),
-      category: reportData.category,
-      location: reportData.location.trim(),
-      status: 'PENDING',
-      priority: reportData.priority || 'Medium',
-      createdAt: new Date().toISOString(),
-      imageUrl: reportData.imageUrl || null,
-    };
-
-    setReports((prevReports) => [newReport, ...prevReports]);
-    return newReport;
   };
 
   /**
-   * Update the status of an existing report (used by Administrator)
-   * @param {string} id - Report ID
+   * Partially update a report's status (PATCH /api/reports/{id})
+   * Used primarily by administrators.
+   * @param {string|number} id - Report ID
    * @param {'PENDING'|'IN_PROGRESS'|'RESOLVED'} newStatus - New status
-   * @returns {boolean} true if updated successfully
+   * @returns {Promise<Object>} Updated report from backend
    */
-  const updateReportStatus = (id, newStatus) => {
-    if (!id || !newStatus) return false;
-    const normalizedStatus = newStatus.toUpperCase();
+  const updateReportStatus = async (id, newStatus) => {
+    if (!id || !newStatus) return null;
+    setIsUpdating(true);
 
-    let updated = false;
-    setReports((prevReports) =>
-      prevReports.map((report) => {
-        if (report.id.toLowerCase() === id.trim().toLowerCase()) {
-          updated = true;
-          return {
-            ...report,
-            status: normalizedStatus,
-            updatedAt: new Date().toISOString(),
-          };
-        }
-        return report;
-      })
-    );
+    const targetId = String(id).replace(/^REP-/, ''); // Clean numeric ID
+    const normalizedStatus = String(newStatus).toUpperCase();
 
-    return updated;
+    try {
+      const updatedReport = await reportsApi.update(targetId, {
+        status: normalizedStatus,
+      });
+
+      // Update state with confirmed report from backend
+      setReports((prev) =>
+        prev.map((r) => (String(r.id) === String(targetId) ? updatedReport : r))
+      );
+
+      return updatedReport;
+    } catch (err) {
+      console.error(`Failed to update status for report #${id}:`, err);
+      throw err;
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
   /**
-   * Delete a report by ID (optional admin capability)
-   * @param {string} id - Report ID
-   */
-  const deleteReport = (id) => {
-    if (!id) return;
-    setReports((prevReports) =>
-      prevReports.filter((r) => r.id.toLowerCase() !== id.trim().toLowerCase())
-    );
-  };
-
-  /**
-   * Find a report by its ID
-   * @param {string} id
+   * Find a report by its ID from current local state
+   * @param {string|number} id
    */
   const getReportById = (id) => {
     if (!id) return null;
-    return reports.find((r) => r.id.toLowerCase() === id.trim().toLowerCase()) || null;
+    const cleanId = String(id).replace(/^REP-/, '').toLowerCase();
+    return (
+      reports.find(
+        (r) =>
+          String(r.id).toLowerCase() === cleanId ||
+          String(r.id).toLowerCase() === String(id).toLowerCase()
+      ) || null
+    );
   };
 
   /**
-   * Reset sample reports back to original initial data
+   * Directly fetch a single report from backend by ID (useful on direct URL navigation)
+   * @param {string|number} id
    */
-  const resetToSampleData = () => {
-    setReports(INITIAL_SAMPLE_REPORTS);
+  const fetchReportById = async (id) => {
+    if (!id) return null;
+    const cleanId = String(id).replace(/^REP-/, '');
     try {
-      localStorage.removeItem(LOCAL_STORAGE_KEY);
-    } catch (e) {
-      console.warn('Failed to reset localStorage', e);
+      const data = await reportsApi.getById(cleanId);
+      // Ensure it is cached in our reports list
+      setReports((prev) => {
+        const exists = prev.some((r) => String(r.id) === String(cleanId));
+        return exists ? prev.map((r) => (String(r.id) === String(cleanId) ? data : r)) : [data, ...prev];
+      });
+      return data;
+    } catch (err) {
+      console.error(`Failed to fetch report #${id}:`, err);
+      throw err;
     }
   };
 
@@ -118,11 +173,15 @@ export const ReportsProvider = ({ children }) => {
     <ReportsContext.Provider
       value={{
         reports,
+        loading,
+        error,
+        isSubmitting,
+        isUpdating,
+        fetchReports,
         addReport,
         updateReportStatus,
-        deleteReport,
         getReportById,
-        resetToSampleData,
+        fetchReportById,
       }}
     >
       {children}
@@ -130,7 +189,7 @@ export const ReportsProvider = ({ children }) => {
   );
 };
 
-// Custom hook for convenient access to reports state in components
+// Custom hook for accessing reports state in components
 export const useReports = () => {
   const context = useContext(ReportsContext);
   if (!context) {

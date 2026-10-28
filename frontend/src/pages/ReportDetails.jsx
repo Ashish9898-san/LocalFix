@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { 
   ArrowLeft, 
@@ -10,25 +10,102 @@ import {
   AlertTriangle, 
   ShieldCheck,
   FileText,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Loader2,
+  Check,
+  AlertCircle
 } from 'lucide-react';
 import { useReports } from '../context/ReportsContext';
 import StatusBadge from '../components/StatusBadge';
 import EmptyState from '../components/EmptyState';
-import { formatFullDateTime } from '../utils/reportUtils';
+import Loading from '../components/Loading';
+import ErrorMessage from '../components/ErrorMessage';
+import { formatFullDateTime, formatCategory } from '../utils/reportUtils';
+import { reportsApi } from '../services/api';
 
 export default function ReportDetails() {
   const { id } = useParams();
-  const { getReportById } = useReports();
+  const { getReportById, fetchReportById, updateReportStatus, loading: contextLoading } = useReports();
 
-  const report = getReportById(id);
+  const [report, setReport] = useState(() => getReportById(id));
+  const [loading, setLoading] = useState(!report);
+  const [error, setError] = useState(null);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [statusNotification, setStatusNotification] = useState(null);
+  const [imageError, setImageError] = useState(false);
 
-  if (!report) {
+  // Sync or fetch report when ID changes or after context loads
+  useEffect(() => {
+    setImageError(false);
+    const existing = getReportById(id);
+    if (existing) {
+      setReport(existing);
+      setLoading(false);
+      return;
+    }
+
+    let isMounted = true;
+    setLoading(true);
+    fetchReportById(id)
+      .then((data) => {
+        if (isMounted) {
+          setReport(data);
+          setError(null);
+        }
+      })
+      .catch((err) => {
+        if (isMounted) {
+          setError(err.message || 'Report not found');
+          setReport(null);
+        }
+      })
+      .finally(() => {
+        if (isMounted) setLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [id, getReportById, fetchReportById]);
+
+  const handleStatusUpdate = async (newStatus) => {
+    if (!report || !newStatus || newStatus === report.status) return;
+    setIsUpdatingStatus(true);
+    setStatusNotification(null);
+    try {
+      const updated = await updateReportStatus(report.id, newStatus);
+      if (updated) {
+        setReport(updated);
+        setStatusNotification({
+          type: 'success',
+          message: `Status successfully updated to "${newStatus.replace('_', ' ')}".`,
+        });
+        setTimeout(() => setStatusNotification(null), 5000);
+      }
+    } catch (err) {
+      setStatusNotification({
+        type: 'error',
+        message: err.message || 'Failed to update status.',
+      });
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
+  if (loading || (contextLoading && !report)) {
+    return (
+      <div className="max-w-3xl mx-auto px-4 py-16">
+        <Loading message={`Loading ticket #${id} from database...`} />
+      </div>
+    );
+  }
+
+  if (error || !report) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-16">
         <EmptyState
           title="Report Not Found"
-          description={`We could not locate any problem report registered with ticket ID "${id}". It may have been removed or never existed.`}
+          description={`We could not locate any problem report registered with ticket ID "${id}" in the database.`}
           actionLabel="Return to Browse Reports"
           onAction={() => window.location.href = '/reports'}
         />
@@ -37,9 +114,9 @@ export default function ReportDetails() {
   }
 
   // Timeline step statuses
-  const isPending = report.status === 'PENDING';
-  const isInProgress = report.status === 'IN_PROGRESS';
-  const isResolved = report.status === 'RESOLVED';
+  const isPending = String(report.status).toUpperCase() === 'PENDING';
+  const isInProgress = String(report.status).toUpperCase() === 'IN_PROGRESS';
+  const isResolved = String(report.status).toUpperCase() === 'RESOLVED';
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
@@ -65,11 +142,11 @@ export default function ReportDetails() {
               </span>
               <span className="text-xs font-semibold text-emerald-800 bg-emerald-100/70 px-2.5 py-1 rounded-md flex items-center gap-1">
                 <Tag className="w-3 h-3" />
-                {report.category}
+                {formatCategory(report.category)}
               </span>
-              {report.priority && (
+              {(report.severity || report.priority) && (
                 <span className="text-xs font-semibold text-gray-700 bg-gray-100 px-2 py-0.5 rounded-md">
-                  Priority: {report.priority}
+                  Severity: {report.severity || report.priority}
                 </span>
               )}
             </div>
@@ -88,7 +165,7 @@ export default function ReportDetails() {
           {/* Left Column: Description, Photo, and Progress Tracker */}
           <div className="lg:col-span-2 space-y-8">
             {/* Attached Photo if available */}
-            {report.imageUrl && (
+            {report.imageUrl && !imageError && (
               <div>
                 <h2 className="text-sm font-bold uppercase tracking-wider text-gray-400 mb-3 flex items-center gap-2">
                   <ImageIcon className="w-4 h-4 text-emerald-600" />
@@ -96,11 +173,19 @@ export default function ReportDetails() {
                 </h2>
                 <div className="rounded-2xl overflow-hidden border border-gray-200 bg-gray-100 max-h-96 shadow-sm">
                   <img
-                    src={report.imageUrl}
+                    src={reportsApi.formatImageUrl(report.imageUrl)}
                     alt={report.title}
+                    onError={() => setImageError(true)}
                     className="w-full h-full object-cover"
                   />
                 </div>
+              </div>
+            )}
+
+            {report.imageUrl && imageError && (
+              <div className="p-4 bg-gray-50 border border-gray-200/80 rounded-2xl flex items-center gap-3 text-sm text-gray-500">
+                <ImageIcon className="w-5 h-5 text-gray-400 shrink-0" />
+                <span>Attached photo evidence is unavailable or could not be loaded.</span>
               </div>
             )}
 
@@ -129,7 +214,7 @@ export default function ReportDetails() {
                     <CheckCircle2 className="w-5 h-5" />
                   </div>
                   <span className="text-xs font-bold text-gray-900">Submitted</span>
-                  <span className="text-[11px] text-gray-500 mt-0.5">Ticket registered</span>
+                  <span className="text-[11px] text-gray-500 mt-0.5">Ticket registered in DB</span>
                 </div>
 
                 {/* Step 2: Under Review / In Progress */}
@@ -208,7 +293,7 @@ export default function ReportDetails() {
                 <div>
                   <span className="text-gray-500 block mb-0.5 font-medium">Issue Category</span>
                   <div className="font-semibold text-gray-900">
-                    {report.category}
+                    {formatCategory(report.category)}
                   </div>
                 </div>
 
@@ -222,20 +307,64 @@ export default function ReportDetails() {
             </div>
 
             {/* Admin Quick Action Banner */}
-            <div className="p-4 bg-emerald-50/70 border border-emerald-100 rounded-xl text-xs text-emerald-950 space-y-2">
-              <div className="flex items-center gap-1.5 font-bold text-emerald-900">
-                <ShieldCheck className="w-4 h-4 text-emerald-700" />
-                <span>Admin Management</span>
+            <div className="p-4 bg-emerald-50/70 border border-emerald-100 rounded-xl text-xs text-emerald-950 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5 font-bold text-emerald-900">
+                  <ShieldCheck className="w-4 h-4 text-emerald-700" />
+                  <span>Admin Workflow Action</span>
+                </div>
+                <Link
+                  to="/admin"
+                  className="font-medium text-[11px] text-emerald-700 hover:text-emerald-900 underline underline-offset-2"
+                >
+                  Admin Panel &rarr;
+                </Link>
               </div>
-              <p className="text-emerald-800 leading-relaxed">
-                Need to update the status of this ticket? Use the Administrator Dashboard to mark it In Progress or Resolved.
-              </p>
-              <Link
-                to="/admin"
-                className="inline-block mt-1 font-semibold text-emerald-700 hover:text-emerald-900 underline underline-offset-2"
-              >
-                Go to Administrator Dashboard &rarr;
-              </Link>
+
+              {statusNotification && (
+                <div
+                  className={`p-2.5 rounded-lg text-xs flex items-center gap-2 ${
+                    statusNotification.type === 'error'
+                      ? 'bg-red-100 text-red-900'
+                      : 'bg-emerald-100 text-emerald-900'
+                  }`}
+                >
+                  {statusNotification.type === 'error' ? (
+                    <AlertCircle className="w-3.5 h-3.5 text-red-600 shrink-0" />
+                  ) : (
+                    <Check className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                  )}
+                  <span>{statusNotification.message}</span>
+                </div>
+              )}
+
+              <div>
+                <label htmlFor="details-status-select" className="text-gray-600 block mb-1 font-medium">
+                  Update Resolution Status:
+                </label>
+                <div className="flex items-center gap-2">
+                  <select
+                    id="details-status-select"
+                    value={report.status}
+                    disabled={isUpdatingStatus}
+                    onChange={(e) => handleStatusUpdate(e.target.value)}
+                    className="w-full text-xs font-semibold py-1.5 px-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 disabled:opacity-50"
+                  >
+                    <option value="PENDING" disabled={report.status === 'RESOLVED'}>
+                      Pending Review
+                    </option>
+                    <option value="IN_PROGRESS">
+                      {report.status === 'RESOLVED' ? 'Reopen (In Progress)' : 'In Progress'}
+                    </option>
+                    <option value="RESOLVED">
+                      Resolved
+                    </option>
+                  </select>
+                  {isUpdatingStatus && (
+                    <Loader2 className="w-4 h-4 text-emerald-600 animate-spin shrink-0" />
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </div>

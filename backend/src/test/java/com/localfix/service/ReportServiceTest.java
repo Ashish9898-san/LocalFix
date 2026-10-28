@@ -198,6 +198,34 @@ class ReportServiceTest {
     }
 
     @Test
+    @DisplayName("createReport handles large base64 image strings without errors")
+    void createReport_withLargeBase64Image() {
+        String largeBase64 = "data:image/png;base64," + "B".repeat(100000);
+        CreateReportRequest request = new CreateReportRequest(
+                "Pothole with photo attachment",
+                "Large pothole photographed from car dashboard",
+                ReportCategory.ROADS,
+                ReportSeverity.MEDIUM,
+                "Oak Street & 2nd Ave",
+                largeBase64
+        );
+
+        when(reportRepository.save(any(Report.class))).thenAnswer(invocation -> {
+            Report r = invocation.getArgument(0);
+            return createSampleEntity(3L, r.getTitle(), r.getCategory(), r.getSeverity(), r.getStatus(), r.getLocation(), r.getImageUrl());
+        });
+
+        ReportResponse response = reportService.createReport(request);
+
+        assertThat(response.id()).isEqualTo(3L);
+        assertThat(response.imageUrl()).isEqualTo(largeBase64);
+        ArgumentCaptor<Report> captor = ArgumentCaptor.forClass(Report.class);
+        verify(reportRepository).save(captor.capture());
+        assertThat(captor.getValue().getImageUrl()).isEqualTo(largeBase64);
+        assertThat(captor.getValue().getCreatedAt()).isNotNull();
+    }
+
+    @Test
     @DisplayName("updateReport selectively updates non-null fields and preserves others")
     void updateReport_partialUpdate() {
         Report existing = createSampleEntity(5L, "Old Title", ReportCategory.ROADS, ReportSeverity.LOW, ReportStatus.PENDING, "Old Location", "https://old.com/pic.jpg");
@@ -233,6 +261,45 @@ class ReportServiceTest {
         UpdateReportRequest request = new UpdateReportRequest("New Title", null, null, null, null, null, null);
 
         assertThrows(ResourceNotFoundException.class, () -> reportService.updateReport(404L, request));
+        verify(reportRepository, never()).save(any(Report.class));
+    }
+
+    @Test
+    @DisplayName("updateReport permits valid status transition PENDING -> RESOLVED")
+    void updateReport_transition_pendingToResolved() {
+        Report existing = createSampleEntity(10L, "Streetlight", ReportCategory.STREETLIGHTS, ReportSeverity.LOW, ReportStatus.PENDING, "5th Ave", null);
+        when(reportRepository.findById(10L)).thenReturn(Optional.of(existing));
+        when(reportRepository.save(any(Report.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        UpdateReportRequest request = new UpdateReportRequest(null, null, null, null, null, ReportStatus.RESOLVED, null);
+        ReportResponse updated = reportService.updateReport(10L, request);
+
+        assertThat(updated.status()).isEqualTo(ReportStatus.RESOLVED);
+    }
+
+    @Test
+    @DisplayName("updateReport permits valid reopening transition RESOLVED -> IN_PROGRESS")
+    void updateReport_transition_resolvedToInProgress_reopen() {
+        Report existing = createSampleEntity(11L, "Water pipe", ReportCategory.WATER_LEAKAGE, ReportSeverity.HIGH, ReportStatus.RESOLVED, "Main St", null);
+        when(reportRepository.findById(11L)).thenReturn(Optional.of(existing));
+        when(reportRepository.save(any(Report.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        UpdateReportRequest request = new UpdateReportRequest(null, null, null, null, null, ReportStatus.IN_PROGRESS, null);
+        ReportResponse updated = reportService.updateReport(11L, request);
+
+        assertThat(updated.status()).isEqualTo(ReportStatus.IN_PROGRESS);
+    }
+
+    @Test
+    @DisplayName("updateReport rejects invalid transition RESOLVED -> PENDING with IllegalStateException")
+    void updateReport_invalidTransition_resolvedToPending_throwsException() {
+        Report existing = createSampleEntity(12L, "Garbage", ReportCategory.GARBAGE, ReportSeverity.MEDIUM, ReportStatus.RESOLVED, "Oak Lane", null);
+        when(reportRepository.findById(12L)).thenReturn(Optional.of(existing));
+
+        UpdateReportRequest request = new UpdateReportRequest(null, null, null, null, null, ReportStatus.PENDING, null);
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> reportService.updateReport(12L, request));
+        assertThat(ex.getMessage()).contains("Invalid status transition");
         verify(reportRepository, never()).save(any(Report.class));
     }
 }

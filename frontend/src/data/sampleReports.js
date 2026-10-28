@@ -110,7 +110,8 @@ export const CATEGORIES = [
   'Garbage',
   'Streetlights',
   'Water Leakage',
-  'Public Property'
+  'Public Property',
+  'Other'
 ];
 
 export const STATUSES = [
