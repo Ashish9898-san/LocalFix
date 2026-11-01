@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- Rounded Base Badge in LocalFix Emerald Green -->
+  <rect width="64" height="64" rx="16" fill="#047857"/>
+  
+  <!-- Subtle Gradient Overlay -->
+  <rect width="64" height="64" rx="16" fill="url(#brandGrad)" fill-opacity="0.25"/>
+  
+  <!-- Location Pin Body (White) -->
+  <path d="M32 11C22.611 11 15 18.611 15 28C15 39.5 29.5 51.8 30.7 52.8C31.5 53.4 32.5 53.4 33.3 52.8C34.5 51.8 49 39.5 49 28C49 18.611 41.389 11 32 11Z" fill="#FFFFFF"/>
+  
+  <!-- Pin Inner Circle (Dark Green Accent) -->
+  <circle cx="32" cy="27" r="10" fill="#065F46"/>
+  
+  <!-- Fix / Checkmark Symbol inside Pin (Vibrant Accent Green) -->
+  <path d="M27.5 27.2L30.5 30.2L36.5 23.8" stroke="#34D399" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <defs>
+    <linearGradient id="brandGrad" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#34D399"/>
+      <stop offset="1" stop-color="#064E3B"/>
+    </linearGradient>
+  </defs>
+</svg>

@@ -61,6 +61,17 @@ public class ReportController {
     }
 
     /**
+     * GET /api/reports/my
+     * Retrieves all reports submitted by the currently authenticated citizen.
+     */
+    @GetMapping("/my")
+    public ResponseEntity<List<ReportResponse>> getMyReports(org.springframework.security.core.Authentication authentication) {
+        String email = resolveAuthenticatedEmail(authentication);
+        List<ReportResponse> reports = reportService.getMyReports(email);
+        return ResponseEntity.ok(reports);
+    }
+
+    /**
      * GET /api/reports/{id}
      * Retrieves a single report by its primary key ID.
      * Returns 404 Not Found if no report exists with the given ID.
@@ -73,12 +84,15 @@ public class ReportController {
 
     /**
      * POST /api/reports
-     * Validates and persists a new civic issue report.
+     * Validates and persists a new civic issue report, associating it with the authenticated citizen.
      * Returns HTTP 201 Created with Location header and created report payload.
      */
     @PostMapping
-    public ResponseEntity<ReportResponse> createReport(@Valid @RequestBody CreateReportRequest request) {
-        ReportResponse created = reportService.createReport(request);
+    public ResponseEntity<ReportResponse> createReport(
+            @Valid @RequestBody CreateReportRequest request,
+            org.springframework.security.core.Authentication authentication) {
+        String userEmail = resolveAuthenticatedEmail(authentication);
+        ReportResponse created = reportService.createReport(request, userEmail);
 
         URI location = ServletUriComponentsBuilder.fromCurrentRequest()
                 .path("/{id}")
@@ -86,6 +100,16 @@ public class ReportController {
                 .toUri();
 
         return ResponseEntity.created(location).body(created);
+    }
+
+    private String resolveAuthenticatedEmail(org.springframework.security.core.Authentication authentication) {
+        if (authentication == null) {
+            authentication = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        }
+        if (authentication != null && authentication.isAuthenticated() && !"anonymousUser".equals(authentication.getPrincipal())) {
+            return authentication.getName();
+        }
+        return null;
     }
 
     /**
@@ -99,6 +123,33 @@ public class ReportController {
             @Valid @RequestBody UpdateReportRequest request) {
         ReportResponse updated = reportService.updateReport(id, request);
         return ResponseEntity.ok(updated);
+    }
+
+    /**
+     * DELETE /api/reports/{id}
+     * Deletes a report by its primary key ID.
+     * Citizen users can delete only their own reports.
+     * Administrators can delete any report.
+     * Returns HTTP 204 No Content upon success, 401 if unauthenticated,
+     * 403 if unauthorized, or 404 if not found.
+     */
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteReport(
+            @PathVariable Long id,
+            org.springframework.security.core.Authentication authentication) {
+        if (authentication == null) {
+            authentication = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        }
+        if (authentication == null || !authentication.isAuthenticated() || "anonymousUser".equals(authentication.getPrincipal())) {
+            throw new org.springframework.security.access.AccessDeniedException("Authentication is required to delete a report.");
+        }
+
+        String userEmail = authentication.getName();
+        boolean isAdmin = authentication.getAuthorities().stream()
+                .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
+
+        reportService.deleteReport(id, userEmail, isAdmin);
+        return ResponseEntity.noContent().build();
     }
 
     /**

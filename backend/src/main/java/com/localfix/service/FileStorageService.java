@@ -202,6 +202,51 @@ public class FileStorageService {
         return "jpg";
     }
 
+    /**
+     * Delete an uploaded image file safely from the local filesystem.
+     * Prevents path traversal and handles missing files gracefully.
+     *
+     * @param imageUrl the relative URL (e.g. /api/reports/images/{fileName}) or plain filename
+     * @return true if deleted, false if file did not exist or could not be deleted
+     */
+    public boolean deleteImageFile(String imageUrl) {
+        if (!StringUtils.hasText(imageUrl)) {
+            return false;
+        }
+
+        // Extract filename if a relative endpoint path is supplied
+        String fileName = imageUrl.trim();
+        if (fileName.contains("/")) {
+            fileName = fileName.substring(fileName.lastIndexOf('/') + 1);
+        }
+
+        // Validate filename format to prevent path traversal
+        if (!SAFE_FILENAME_PATTERN.matcher(fileName).matches() || fileName.contains("..")) {
+            log.warn("Invalid filename format or path traversal attempt during deletion: {}", fileName);
+            return false;
+        }
+
+        try {
+            Path filePath = this.rootLocation.resolve(fileName).normalize().toAbsolutePath();
+
+            if (!filePath.startsWith(this.rootLocation)) {
+                log.warn("Access denied: Path traversal outside upload directory: {}", filePath);
+                return false;
+            }
+
+            boolean deleted = Files.deleteIfExists(filePath);
+            if (deleted) {
+                log.info("Successfully deleted attached report photograph: {}", fileName);
+            } else {
+                log.debug("Image file not found on disk for deletion: {}", fileName);
+            }
+            return deleted;
+        } catch (IOException e) {
+            log.error("Failed to delete image file on disk: {}", fileName, e);
+            return false;
+        }
+    }
+
     public Path getRootLocation() {
         return rootLocation;
     }

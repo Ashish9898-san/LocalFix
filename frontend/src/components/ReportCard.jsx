@@ -72,9 +72,16 @@ export default function ReportCard({ report }) {
             <MapPin className="w-3.5 h-3.5 text-gray-400 shrink-0" />
             <span className="truncate">{report.location}</span>
           </div>
-          <div className="flex items-center gap-1.5">
-            <Calendar className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-            <span>Reported on {formatDate(report.createdAt)}</span>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <Calendar className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+              <span>{formatDate(report.createdAt)}</span>
+            </div>
+            {report.reporterName && (
+              <span className="text-[11px] text-gray-400 truncate max-w-[130px]" title={`Reported by ${report.reporterName}`}>
+                by {report.reporterName}
+              </span>
+            )}
           </div>
         </div>
       </div>

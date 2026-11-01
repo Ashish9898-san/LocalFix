@@ -9,6 +9,7 @@ import com.localfix.entity.ReportSeverity;
 import com.localfix.entity.ReportStatus;
 import com.localfix.exception.ResourceNotFoundException;
 import com.localfix.repository.ReportRepository;
+import com.localfix.repository.UserRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -36,6 +37,12 @@ class ReportServiceTest {
 
     @Mock
     private ReportRepository reportRepository;
+
+    @Mock
+    private UserRepository userRepository;
+
+    @Mock
+    private FileStorageService fileStorageService;
 
     @InjectMocks
     private ReportService reportService;
@@ -301,5 +308,111 @@ class ReportServiceTest {
         IllegalStateException ex = assertThrows(IllegalStateException.class, () -> reportService.updateReport(12L, request));
         assertThat(ex.getMessage()).contains("Invalid status transition");
         verify(reportRepository, never()).save(any(Report.class));
+    }
+
+    @Test
+    @DisplayName("createReport with user email associates report with authenticated user")
+    void createReport_withUser_associatesReporter() {
+        com.localfix.entity.User user = new com.localfix.entity.User(
+                "Jane Doe", "jane@example.com", "hash", com.localfix.entity.UserRole.USER
+        );
+        when(userRepository.findByEmailIgnoreCase("jane@example.com")).thenReturn(Optional.of(user));
+        when(reportRepository.save(any(Report.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        CreateReportRequest request = new CreateReportRequest(
+                "Broken Light", "Streetlight is out", ReportCategory.STREETLIGHTS,
+                ReportSeverity.MEDIUM, "Pine Rd", null
+        );
+
+        ReportResponse response = reportService.createReport(request, "jane@example.com");
+
+        assertThat(response).isNotNull();
+        assertThat(response.title()).isEqualTo("Broken Light");
+        ArgumentCaptor<Report> captor = ArgumentCaptor.forClass(Report.class);
+        verify(reportRepository).save(captor.capture());
+        assertThat(captor.getValue().getReporter()).isEqualTo(user);
+    }
+
+    @Test
+    @DisplayName("getMyReports retrieves reports for authenticated user ordered newest first")
+    void getMyReports_success() {
+        com.localfix.entity.User user = new com.localfix.entity.User(
+                "Jane Doe", "jane@example.com", "hash", com.localfix.entity.UserRole.USER
+        );
+        Report r1 = createSampleEntity(21L, "Pothole", ReportCategory.ROADS, ReportSeverity.HIGH, ReportStatus.PENDING, "5th St", null);
+        r1.setReporter(user);
+
+        when(userRepository.findByEmailIgnoreCase("jane@example.com")).thenReturn(Optional.of(user));
+        when(reportRepository.findByReporterOrderByCreatedAtDesc(user)).thenReturn(List.of(r1));
+
+        List<ReportResponse> results = reportService.getMyReports("jane@example.com");
+
+        assertThat(results).hasSize(1);
+        assertThat(results.get(0).title()).isEqualTo("Pothole");
+        assertThat(results.get(0).reporterName()).isEqualTo("Jane Doe");
+    }
+
+    @Test
+    @DisplayName("deleteReport as owner deletes report and calls fileStorageService to clean image")
+    void deleteReport_asOwner_success() {
+        com.localfix.entity.User owner = new com.localfix.entity.User(
+                "Jane Doe", "jane@example.com", "hash", com.localfix.entity.UserRole.USER
+        );
+        Report report = createSampleEntity(10L, "Pothole", ReportCategory.ROADS, ReportSeverity.HIGH, ReportStatus.PENDING, "5th Ave", "/api/reports/images/sample.jpg");
+        report.setReporter(owner);
+
+        when(reportRepository.findById(10L)).thenReturn(Optional.of(report));
+
+        reportService.deleteReport(10L, "jane@example.com", false);
+
+        verify(fileStorageService).deleteImageFile("/api/reports/images/sample.jpg");
+        verify(reportRepository).delete(report);
+    }
+
+    @Test
+    @DisplayName("deleteReport as admin deletes any report regardless of ownership")
+    void deleteReport_asAdmin_success() {
+        com.localfix.entity.User owner = new com.localfix.entity.User(
+                "Other User", "other@example.com", "hash", com.localfix.entity.UserRole.USER
+        );
+        Report report = createSampleEntity(11L, "Broken Glass", ReportCategory.OTHER, ReportSeverity.LOW, ReportStatus.PENDING, "Park St", null);
+        report.setReporter(owner);
+
+        when(reportRepository.findById(11L)).thenReturn(Optional.of(report));
+
+        reportService.deleteReport(11L, "admin@localfix.org", true);
+
+        verify(reportRepository).delete(report);
+    }
+
+    @Test
+    @DisplayName("deleteReport as non-owner throws AccessDeniedException and does not delete")
+    void deleteReport_asNonOwner_throwsAccessDenied() {
+        com.localfix.entity.User owner = new com.localfix.entity.User(
+                "Real Owner", "owner@example.com", "hash", com.localfix.entity.UserRole.USER
+        );
+        Report report = createSampleEntity(12L, "Graffiti", ReportCategory.PUBLIC_PROPERTY, ReportSeverity.LOW, ReportStatus.PENDING, "Main St", null);
+        report.setReporter(owner);
+
+        when(reportRepository.findById(12L)).thenReturn(Optional.of(report));
+
+        assertThrows(org.springframework.security.access.AccessDeniedException.class, () ->
+                reportService.deleteReport(12L, "intruder@example.com", false)
+        );
+
+        verify(reportRepository, never()).delete(any());
+        verify(fileStorageService, never()).deleteImageFile(any());
+    }
+
+    @Test
+    @DisplayName("deleteReport with non-existent ID throws ResourceNotFoundException")
+    void deleteReport_notFound_throwsException() {
+        when(reportRepository.findById(999L)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class, () ->
+                reportService.deleteReport(999L, "jane@example.com", false)
+        );
+
+        verify(reportRepository, never()).delete(any());
     }
 }

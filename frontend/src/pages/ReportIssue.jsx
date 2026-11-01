@@ -8,7 +8,6 @@ import {
   Upload, 
   X, 
   RotateCcw, 
-  Info, 
   ExternalLink, 
   Image as ImageIcon 
 } from 'lucide-react';
@@ -196,7 +195,7 @@ export default function ReportIssue() {
   };
 
   return (
-    <div className="max-w-3xl mx-auto px-4 sm:px-6 py-10">
+    <div className="w-full max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
       {/* Back button */}
       <div className="mb-6">
         <Link
@@ -266,7 +265,7 @@ export default function ReportIssue() {
         /* The Report Form */
         <div className="bg-white rounded-2xl border border-gray-200/90 shadow-sm overflow-hidden">
           {/* Form Header */}
-          <div className="bg-gradient-to-r from-emerald-800 to-emerald-750 text-white p-6 sm:p-8">
+          <div className="bg-gradient-to-r from-emerald-800 to-emerald-700 text-white p-6 sm:p-8">
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
               Report a Civic Issue
             </h1>
@@ -277,13 +276,6 @@ export default function ReportIssue() {
 
           {/* Form */}
           <form onSubmit={handleSubmit} noValidate className="p-6 sm:p-8 space-y-6">
-            {/* Live API Context Notice */}
-            <div className="flex items-start gap-3 p-3.5 bg-emerald-50/80 border border-emerald-200 rounded-xl text-xs text-emerald-900">
-              <Info className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" />
-              <p className="leading-relaxed">
-                <strong>Live API Integration (Phase 6):</strong> This form communicates via Axios with your Spring Boot backend (<code>POST /api/reports</code>). Validated records are persisted permanently to your MySQL database.
-              </p>
-            </div>
 
             {/* Error Alert if submission failed */}
             {submitError && (
@@ -506,8 +498,8 @@ export default function ReportIssue() {
                 </p>
               )}
 
-              <p className="text-[11px] text-gray-400 leading-normal">
-                <em>Note: Photos are uploaded securely via multipart/form-data to the backend file storage, and the image reference is linked to your civic report in MySQL.</em>
+              <p className="text-[11px] text-gray-500 leading-normal">
+                Clear photos help municipal field teams locate and assess civic issues faster.
               </p>
             </div>
 

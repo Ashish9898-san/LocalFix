@@ -22,7 +22,7 @@ export default function Footer() {
             </p>
             <div className="flex items-center gap-2 text-xs text-emerald-400 font-medium">
               <ShieldCheck className="w-4 h-4" />
-              <span>Phase 1 Prototype &bull; React + Vite &bull; MySQL-Ready Architecture</span>
+              <span>Local Problem Reporting &amp; Tracking Platform</span>
             </div>
           </div>
 
@@ -50,6 +50,15 @@ export default function Footer() {
               <li>
                 <Link to="/dashboard" className="hover:text-emerald-400 transition-colors">
                   Community Dashboard
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/admin/login"
+                  className="flex items-center gap-1.5 text-emerald-400 hover:text-emerald-300 font-medium transition-colors"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  <span>Admin Login</span>
                 </Link>
               </li>
             </ul>

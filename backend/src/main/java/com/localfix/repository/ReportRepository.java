@@ -3,6 +3,7 @@ package com.localfix.repository;
 import com.localfix.entity.Report;
 import com.localfix.entity.ReportCategory;
 import com.localfix.entity.ReportStatus;
+import com.localfix.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -40,4 +41,10 @@ public interface ReportRepository extends JpaRepository<Report, Long> {
      * Filter reports by both category and status ordered newest first.
      */
     List<Report> findByCategoryAndStatusOrderByCreatedAtDesc(ReportCategory category, ReportStatus status);
+
+    /**
+     * Retrieve all reports submitted by a specific user, ordered newest first.
+     * Used for the "My Reports" view.
+     */
+    List<Report> findByReporterOrderByCreatedAtDesc(User reporter);
 }

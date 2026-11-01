@@ -34,7 +34,7 @@ import java.util.List;
 import static org.hamcrest.Matchers.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -45,6 +45,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * Does not initialize real database or Hikari connection pool.
  */
 @WebMvcTest(ReportController.class)
+@org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc(addFilters = false)
 @Import({GlobalExceptionHandler.class, WebConfig.class, AdminAuthInterceptor.class})
 class ReportControllerTest {
 
@@ -114,6 +115,20 @@ class ReportControllerTest {
     }
 
     @Test
+    @DisplayName("GET /api/reports/my returns list of reports submitted by authenticated user")
+    void getMyReports_success() throws Exception {
+        ReportResponse r1 = sampleResponse(1L, "My Pothole Report", ReportCategory.ROADS, ReportSeverity.HIGH, ReportStatus.PENDING);
+        when(reportService.getMyReports(any())).thenReturn(List.of(r1));
+
+        mockMvc.perform(get("/api/reports/my")
+                .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].id").value(1))
+                .andExpect(jsonPath("$[0].title").value("My Pothole Report"));
+    }
+
+    @Test
     @DisplayName("GET /api/reports/{id} returns 200 OK when found")
     void getReportById_found() throws Exception {
         ReportResponse r1 = sampleResponse(10L, "Broken Streetlight", ReportCategory.STREETLIGHTS, ReportSeverity.LOW, ReportStatus.RESOLVED);
@@ -154,7 +169,7 @@ class ReportControllerTest {
         );
 
         ReportResponse created = sampleResponse(42L, request.title(), request.category(), request.severity(), ReportStatus.PENDING);
-        when(reportService.createReport(any(CreateReportRequest.class))).thenReturn(created);
+        when(reportService.createReport(any(CreateReportRequest.class), any())).thenReturn(created);
 
         mockMvc.perform(post("/api/reports")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -185,7 +200,7 @@ class ReportControllerTest {
                 request.severity(), request.location(), ReportStatus.PENDING,
                 largeBase64, Instant.now(), Instant.now()
         );
-        when(reportService.createReport(any(CreateReportRequest.class))).thenReturn(created);
+        when(reportService.createReport(any(CreateReportRequest.class), any())).thenReturn(created);
 
         mockMvc.perform(post("/api/reports")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -402,6 +417,75 @@ class ReportControllerTest {
                 .thenThrow(new ResourceNotFoundException("Image", "fileName", "nonexistent.jpg"));
 
         mockMvc.perform(get("/api/reports/images/nonexistent.jpg"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status").value(404));
+    }
+
+    @Test
+    @DisplayName("DELETE /api/reports/{id} as owner returns 204 No Content")
+    void deleteReport_asOwner_returns204() throws Exception {
+        org.springframework.security.authentication.UsernamePasswordAuthenticationToken principal =
+                new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+                        "jane@example.com", "N/A",
+                        java.util.List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_USER"))
+                );
+
+        doNothing().when(reportService).deleteReport(1L, "jane@example.com", false);
+
+        mockMvc.perform(delete("/api/reports/1").principal(principal))
+                .andExpect(status().isNoContent());
+
+        verify(reportService).deleteReport(1L, "jane@example.com", false);
+    }
+
+    @Test
+    @DisplayName("DELETE /api/reports/{id} as admin returns 204 No Content")
+    void deleteReport_asAdmin_returns204() throws Exception {
+        org.springframework.security.authentication.UsernamePasswordAuthenticationToken adminPrincipal =
+                new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+                        "admin@localfix.org", "N/A",
+                        java.util.List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_ADMIN"))
+                );
+
+        doNothing().when(reportService).deleteReport(1L, "admin@localfix.org", true);
+
+        mockMvc.perform(delete("/api/reports/1").principal(adminPrincipal))
+                .andExpect(status().isNoContent());
+
+        verify(reportService).deleteReport(1L, "admin@localfix.org", true);
+    }
+
+    @Test
+    @DisplayName("DELETE /api/reports/{id} for non-owner returns 403 Forbidden")
+    void deleteReport_asNonOwner_returns403() throws Exception {
+        org.springframework.security.authentication.UsernamePasswordAuthenticationToken principal =
+                new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+                        "intruder@example.com", "N/A",
+                        java.util.List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_USER"))
+                );
+
+        doThrow(new org.springframework.security.access.AccessDeniedException("You do not have permission to delete this report."))
+                .when(reportService).deleteReport(1L, "intruder@example.com", false);
+
+        mockMvc.perform(delete("/api/reports/1").principal(principal))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value(403))
+                .andExpect(jsonPath("$.message", containsString("do not have permission to delete")));
+    }
+
+    @Test
+    @DisplayName("DELETE /api/reports/{id} with nonexistent ID returns 404 Not Found")
+    void deleteReport_notFound_returns404() throws Exception {
+        org.springframework.security.authentication.UsernamePasswordAuthenticationToken principal =
+                new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+                        "jane@example.com", "N/A",
+                        java.util.List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_USER"))
+                );
+
+        doThrow(new ResourceNotFoundException("Report", "id", 999L))
+                .when(reportService).deleteReport(999L, "jane@example.com", false);
+
+        mockMvc.perform(delete("/api/reports/999").principal(principal))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value(404));
     }

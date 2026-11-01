@@ -27,6 +27,28 @@ const apiClient = axios.create({
 });
 
 /**
+ * Storage keys for auth persistence
+ */
+export const TOKEN_STORAGE_KEY = 'localfix_token';
+export const USER_STORAGE_KEY = 'localfix_user';
+
+/**
+ * Global request interceptor:
+ * Automatically injects the JWT Bearer token into the Authorization header
+ * if an active session token is stored in localStorage.
+ */
+apiClient.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem(TOKEN_STORAGE_KEY);
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+/**
  * Global response interceptor:
  * Extracts helpful error details from server responses or network failures,
  * normalizing them so UI components can display clean user-friendly alerts.
@@ -39,6 +61,7 @@ apiClient.interceptors.response.use(
       message: 'An unexpected error occurred.',
       fieldErrors: {},
       isNetworkError: false,
+      isUnauthorized: false,
     };
 
     if (!error.response) {
@@ -56,11 +79,15 @@ apiClient.interceptors.response.use(
         if (data?.errors && typeof data.errors === 'object') {
           normalizedError.fieldErrors = data.errors;
         }
+      } else if (status === 401) {
+        normalizedError.isUnauthorized = true;
+        normalizedError.message =
+          data?.message || 'Authentication required or session expired. Please log in again.';
       } else if (status === 403) {
         normalizedError.message =
-          data?.message || 'Access Denied: Administrator credentials are required to perform this action.';
+          data?.message || 'Access Denied: You do not have permission to perform this action.';
       } else if (status === 404) {
-        normalizedError.message = data?.message || 'The requested report was not found.';
+        normalizedError.message = data?.message || 'The requested resource was not found.';
       } else if (status === 500) {
         normalizedError.message =
           'A server-side error occurred. Please try again later or check backend logs.';
@@ -93,6 +120,15 @@ export const reportsApi = {
    */
   getById: async (id) => {
     const response = await apiClient.get(`/reports/${id}`);
+    return response.data;
+  },
+
+  /**
+   * GET /api/reports/my
+   * Fetches only the reports submitted by the currently authenticated user.
+   */
+  getMyReports: async () => {
+    const response = await apiClient.get('/reports/my');
     return response.data;
   },
 
@@ -169,6 +205,43 @@ export const reportsApi = {
 
   getDbHealth: async () => {
     const response = await apiClient.get('/health/db');
+    return response.data;
+  },
+};
+
+/**
+ * Authentication API Endpoints (Phase 9.5)
+ */
+export const authApi = {
+  /**
+   * POST /api/auth/register
+   * Registers a new citizen user account.
+   * Expects: { name, email, password }
+   * Returns: { token, id, name, email, role }
+   */
+  register: async (userData) => {
+    const response = await apiClient.post('/auth/register', userData);
+    return response.data;
+  },
+
+  /**
+   * POST /api/auth/login
+   * Authenticates user or administrator.
+   * Expects: { email, password }
+   * Returns: { token, id, name, email, role }
+   */
+  login: async (credentials) => {
+    const response = await apiClient.post('/auth/login', credentials);
+    return response.data;
+  },
+
+  /**
+   * GET /api/auth/me
+   * Fetches profile data of currently authenticated user using JWT token.
+   * Returns: { id, name, email, role, createdAt }
+   */
+  getMe: async () => {
+    const response = await apiClient.get('/auth/me');
     return response.data;
   },
 };

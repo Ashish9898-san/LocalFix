@@ -52,10 +52,10 @@ public class AdminAuthInterceptor implements HandlerInterceptor {
             return true;
         }
 
-        // Only enforce admin authorization on mutating administrative methods (PATCH, PUT, DELETE)
-        // Public citizen methods (GET /api/reports, POST /api/reports) are always allowed.
+        // Only enforce admin authorization on mutating administrative status methods (PATCH, PUT)
+        // Public citizen methods and DELETE (which enforces citizen-ownership/admin checks in the service) are bypassed here.
         String method = request.getMethod();
-        if (!"PATCH".equalsIgnoreCase(method) && !"PUT".equalsIgnoreCase(method) && !"DELETE".equalsIgnoreCase(method)) {
+        if (!"PATCH".equalsIgnoreCase(method) && !"PUT".equalsIgnoreCase(method)) {
             return true;
         }
 
@@ -65,7 +65,13 @@ public class AdminAuthInterceptor implements HandlerInterceptor {
 
         boolean isAuthorized = false;
 
-        if (adminRole != null && ADMIN_ROLE_VALUE.equalsIgnoreCase(adminRole.trim())) {
+        // 1. Check SecurityContext established by JwtAuthenticationFilter
+        org.springframework.security.core.Authentication auth =
+                org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.isAuthenticated() && auth.getAuthorities().stream()
+                .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()))) {
+            isAuthorized = true;
+        } else if (adminRole != null && ADMIN_ROLE_VALUE.equalsIgnoreCase(adminRole.trim())) {
             isAuthorized = true;
         } else if (authHeader != null && authHeader.startsWith("Bearer ")) {
             String token = authHeader.substring(7).trim();

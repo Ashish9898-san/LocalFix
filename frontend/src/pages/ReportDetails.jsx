@@ -13,8 +13,10 @@ import {
   Image as ImageIcon,
   Loader2,
   Check,
-  AlertCircle
+  AlertCircle,
+  User
 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import { useReports } from '../context/ReportsContext';
 import StatusBadge from '../components/StatusBadge';
 import EmptyState from '../components/EmptyState';
@@ -26,6 +28,7 @@ import { reportsApi } from '../services/api';
 export default function ReportDetails() {
   const { id } = useParams();
   const { getReportById, fetchReportById, updateReportStatus, loading: contextLoading } = useReports();
+  const { isAdmin } = useAuth();
 
   const [report, setReport] = useState(() => getReportById(id));
   const [loading, setLoading] = useState(!report);
@@ -298,6 +301,14 @@ export default function ReportDetails() {
                 </div>
 
                 <div>
+                  <span className="text-gray-500 block mb-0.5 font-medium">Reported By</span>
+                  <div className="flex items-center gap-1.5 font-semibold text-gray-900">
+                    <User className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <span>{report.reporterName || 'Community Member'}</span>
+                  </div>
+                </div>
+
+                <div>
                   <span className="text-gray-500 block mb-0.5 font-medium">Current Status</span>
                   <div className="mt-1">
                     <StatusBadge status={report.status} />
@@ -307,65 +318,77 @@ export default function ReportDetails() {
             </div>
 
             {/* Admin Quick Action Banner */}
-            <div className="p-4 bg-emerald-50/70 border border-emerald-100 rounded-xl text-xs text-emerald-950 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5 font-bold text-emerald-900">
-                  <ShieldCheck className="w-4 h-4 text-emerald-700" />
-                  <span>Admin Workflow Action</span>
-                </div>
-                <Link
-                  to="/admin"
-                  className="font-medium text-[11px] text-emerald-700 hover:text-emerald-900 underline underline-offset-2"
-                >
-                  Admin Panel &rarr;
-                </Link>
-              </div>
-
-              {statusNotification && (
-                <div
-                  className={`p-2.5 rounded-lg text-xs flex items-center gap-2 ${
-                    statusNotification.type === 'error'
-                      ? 'bg-red-100 text-red-900'
-                      : 'bg-emerald-100 text-emerald-900'
-                  }`}
-                >
-                  {statusNotification.type === 'error' ? (
-                    <AlertCircle className="w-3.5 h-3.5 text-red-600 shrink-0" />
-                  ) : (
-                    <Check className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
-                  )}
-                  <span>{statusNotification.message}</span>
-                </div>
-              )}
-
-              <div>
-                <label htmlFor="details-status-select" className="text-gray-600 block mb-1 font-medium">
-                  Update Resolution Status:
-                </label>
-                <div className="flex items-center gap-2">
-                  <select
-                    id="details-status-select"
-                    value={report.status}
-                    disabled={isUpdatingStatus}
-                    onChange={(e) => handleStatusUpdate(e.target.value)}
-                    className="w-full text-xs font-semibold py-1.5 px-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 disabled:opacity-50"
+            {isAdmin ? (
+              <div className="p-4 bg-emerald-50/70 border border-emerald-100 rounded-xl text-xs text-emerald-950 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 font-bold text-emerald-900">
+                    <ShieldCheck className="w-4 h-4 text-emerald-700" />
+                    <span>Admin Workflow Action</span>
+                  </div>
+                  <Link
+                    to="/admin"
+                    className="font-medium text-[11px] text-emerald-700 hover:text-emerald-900 underline underline-offset-2"
                   >
-                    <option value="PENDING" disabled={report.status === 'RESOLVED'}>
-                      Pending Review
-                    </option>
-                    <option value="IN_PROGRESS">
-                      {report.status === 'RESOLVED' ? 'Reopen (In Progress)' : 'In Progress'}
-                    </option>
-                    <option value="RESOLVED">
-                      Resolved
-                    </option>
-                  </select>
-                  {isUpdatingStatus && (
-                    <Loader2 className="w-4 h-4 text-emerald-600 animate-spin shrink-0" />
-                  )}
+                    Admin Panel &rarr;
+                  </Link>
+                </div>
+
+                {statusNotification && (
+                  <div
+                    className={`p-2.5 rounded-lg text-xs flex items-center gap-2 ${
+                      statusNotification.type === 'error'
+                        ? 'bg-red-100 text-red-900'
+                        : 'bg-emerald-100 text-emerald-900'
+                    }`}
+                  >
+                    {statusNotification.type === 'error' ? (
+                      <AlertCircle className="w-3.5 h-3.5 text-red-600 shrink-0" />
+                    ) : (
+                      <Check className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                    )}
+                    <span>{statusNotification.message}</span>
+                  </div>
+                )}
+
+                <div>
+                  <label htmlFor="details-status-select" className="text-gray-600 block mb-1 font-medium">
+                    Update Resolution Status:
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <select
+                      id="details-status-select"
+                      value={report.status}
+                      disabled={isUpdatingStatus}
+                      onChange={(e) => handleStatusUpdate(e.target.value)}
+                      className="w-full text-xs font-semibold py-1.5 px-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 disabled:opacity-50"
+                    >
+                      <option value="PENDING" disabled={report.status === 'RESOLVED'}>
+                        Pending Review
+                      </option>
+                      <option value="IN_PROGRESS">
+                        {report.status === 'RESOLVED' ? 'Reopen (In Progress)' : 'In Progress'}
+                      </option>
+                      <option value="RESOLVED">
+                        Resolved
+                      </option>
+                    </select>
+                    {isUpdatingStatus && (
+                      <Loader2 className="w-4 h-4 text-emerald-600 animate-spin shrink-0" />
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
+            ) : (
+              <div className="p-3.5 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-600 flex items-start gap-2.5">
+                <ShieldCheck className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-semibold text-gray-700">Official Municipal Review</p>
+                  <p className="text-[11px] text-gray-500 mt-0.5">
+                    Ticket statuses are officially verified and updated by municipal authorities upon field inspection.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

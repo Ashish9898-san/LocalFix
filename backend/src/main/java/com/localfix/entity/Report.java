@@ -54,6 +54,14 @@ public class Report {
     @Column(name = "updated_at")
     private Instant updatedAt;
 
+    /**
+     * Submitting citizen (owner) of this civic issue report.
+     * Nullable to safely support reports created before authentication was introduced.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
+    private User reporter;
+
     // Required by JPA specification
     public Report() {
     }
@@ -69,6 +77,12 @@ public class Report {
         this.status = ReportStatus.PENDING;
         this.createdAt = Instant.now();
         this.updatedAt = this.createdAt;
+    }
+
+    public Report(String title, String description, ReportCategory category,
+                  ReportSeverity severity, String location, String imageUrl, User reporter) {
+        this(title, description, category, severity, location, imageUrl);
+        this.reporter = reporter;
     }
 
     @PrePersist
@@ -171,5 +185,13 @@ public class Report {
 
     public void setUpdatedAt(Instant updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public User getReporter() {
+        return reporter;
+    }
+
+    public void setReporter(User reporter) {
+        this.reporter = reporter;
     }
 }

@@ -17,6 +17,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * Web Layer Slice Tests for HealthController.
  */
 @WebMvcTest(HealthController.class)
+@org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc(addFilters = false)
 class HealthControllerTest {
 
     @Autowired

@@ -8,7 +8,9 @@ import com.localfix.entity.ReportCategory;
 import com.localfix.entity.ReportSeverity;
 import com.localfix.entity.ReportStatus;
 import com.localfix.exception.ResourceNotFoundException;
+import com.localfix.entity.User;
 import com.localfix.repository.ReportRepository;
+import com.localfix.repository.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,9 +32,17 @@ import java.util.List;
 public class ReportService {
 
     private final ReportRepository reportRepository;
+    private final UserRepository userRepository;
+    private final FileStorageService fileStorageService;
 
-    public ReportService(ReportRepository reportRepository) {
+    public ReportService(ReportRepository reportRepository, UserRepository userRepository) {
+        this(reportRepository, userRepository, null);
+    }
+
+    public ReportService(ReportRepository reportRepository, UserRepository userRepository, FileStorageService fileStorageService) {
         this.reportRepository = reportRepository;
+        this.userRepository = userRepository;
+        this.fileStorageService = fileStorageService;
     }
 
     /**
@@ -59,6 +69,20 @@ public class ReportService {
     }
 
     /**
+     * Retrieve reports submitted by the authenticated citizen (My Reports).
+     */
+    @Transactional(readOnly = true)
+    public List<ReportResponse> getMyReports(String userEmail) {
+        User user = userRepository.findByEmailIgnoreCase(userEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("User", "email", userEmail));
+
+        List<Report> reports = reportRepository.findByReporterOrderByCreatedAtDesc(user);
+        return reports.stream()
+                .map(ReportResponse::fromEntity)
+                .toList();
+    }
+
+    /**
      * Retrieve a single report by its unique ID.
      * Throws ResourceNotFoundException if the ID does not exist.
      */
@@ -70,12 +94,25 @@ public class ReportService {
     }
 
     /**
-     * Create and persist a new report.
-     * Automatically applies PENDING status and backend timestamps.
+     * Create and persist a new report without an authenticated user (backward compatibility).
      */
     @Transactional
     public ReportResponse createReport(CreateReportRequest request) {
+        return createReport(request, null);
+    }
+
+    /**
+     * Create and persist a new report associated with an authenticated citizen.
+     * Automatically applies PENDING status and backend timestamps.
+     */
+    @Transactional
+    public ReportResponse createReport(CreateReportRequest request, String userEmail) {
         ReportSeverity severity = request.severity() != null ? request.severity() : ReportSeverity.MEDIUM;
+
+        User reporter = null;
+        if (userEmail != null && !userEmail.isBlank()) {
+            reporter = userRepository.findByEmailIgnoreCase(userEmail.trim()).orElse(null);
+        }
 
         Report report = new Report(
                 request.title().trim(),
@@ -83,7 +120,8 @@ public class ReportService {
                 request.category(),
                 severity,
                 request.location().trim(),
-                request.imageUrl()
+                request.imageUrl(),
+                reporter
         );
 
         Report saved = reportRepository.save(report);
@@ -133,5 +171,37 @@ public class ReportService {
 
         Report updated = reportRepository.save(report);
         return ReportResponse.fromEntity(updated);
+    }
+
+    /**
+     * Delete an existing report with ownership or administrator role verification.
+     * Also safely cleans up any associated image stored on disk.
+     *
+     * @param id the primary key of the report
+     * @param currentUserEmail the authenticated user's email
+     * @param isAdmin whether the authenticated user has ROLE_ADMIN
+     */
+    @Transactional
+    public void deleteReport(Long id, String currentUserEmail, boolean isAdmin) {
+        Report report = reportRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Report", "id", id));
+
+        // Authorization Rule: Administrators can delete any report; citizens can only delete their own
+        if (!isAdmin) {
+            if (report.getReporter() == null ||
+                    currentUserEmail == null ||
+                    !currentUserEmail.equalsIgnoreCase(report.getReporter().getEmail())) {
+                throw new org.springframework.security.access.AccessDeniedException(
+                        "You do not have permission to delete this report. Citizens can only delete reports they personally submitted."
+                );
+            }
+        }
+
+        // Clean up photograph from filesystem if present
+        if (report.getImageUrl() != null && fileStorageService != null) {
+            fileStorageService.deleteImageFile(report.getImageUrl());
+        }
+
+        reportRepository.delete(report);
     }
 }

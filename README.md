@@ -8,9 +8,10 @@ LocalFix is a full-stack civic web platform where citizens can report local infr
 
 - **Frontend:** React 18, Vite, React Router, Tailwind CSS, Lucide React
 - **Backend:** Java 21, Spring Boot 3.3.4, Maven
+- **Security & Auth (Phase 9.5):** Spring Security 6.3, JJWT (HMAC-SHA256), BCrypt Password Hashing
 - **Database (Phase 4+):** MySQL 8
 - **ORM & Data Access (Phase 4+):** Spring Data JPA with Hibernate
-- **API Client (Phase 6):** Axios
+- **HTTP Client (Phase 6+):** Axios (with Bearer Token Request Interceptors)
 
 ---
 
@@ -97,14 +98,24 @@ curl -i -X POST http://localhost:8080/api/reports \
     "location": "5th Ave & Market St"
   }'
 
-# List all reports
+# List all public reports
 curl -s http://localhost:8080/api/reports
+
+# Register a new citizen account
+curl -i -X POST http://localhost:8080/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Jane Citizen","email":"jane@example.com","password":"Password123!"}'
+
+# Log in as administrator or citizen
+curl -i -X POST http://localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@localfix.org","password":"Admin@LocalFix2026"}'
 ```
 
 ### 3. Run Backend Automated Tests
 ```bash
 cd backend
-mvn test -Dtest=ReportServiceTest,ReportControllerTest,HealthControllerTest
+mvn test -Dtest=FileStorageServiceTest,ReportControllerTest,ReportServiceTest,HealthControllerTest,JwtServiceTest,AuthServiceTest,AuthControllerTest
 ```
 
 ---
@@ -117,6 +128,7 @@ mvn test -Dtest=ReportServiceTest,ReportControllerTest,HealthControllerTest
 - [x] **Phase 3:** Spring Boot Foundation (Java 21, Maven, Spring Boot 3.3.4, Health REST controller, MockMvc tests).
 - [x] **Phase 4:** MySQL Database Integration (JPA Entities & Repository).
 - [x] **Phase 5:** REST API Development (Report CRUD, Search & Filtering endpoints, validation, error handling, 22 passing tests).
-- [ ] **Phase 6:** Frontend and Backend Integration (Axios client, live API integration).
-- [ ] **Phase 7:** Spring Security & Role-Based Authorization.
-- [ ] **Phase 8:** Final Testing, Error Handling, and Deployment Documentation.
+- [x] **Phase 6:** Frontend and Backend Integration (Axios client, live API integration).
+- [x] **Phase 7:** Admin Report Management & Status Workflow.
+- [x] **Phase 8:** Report Image Uploads & Management (Multipart file upload, local filesystem storage, MIME validation).
+- [x] **Phase 9.5:** Authentication, User Accounts, and Role-Based Access Control (Spring Security, JWT HMAC-SHA256, BCrypt, Citizen Accounts, Seed Administrator, Protected Routes).
